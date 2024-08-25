@@ -50,12 +50,8 @@ class Config(object):
     acs_data_db_path = ConfigProperty('WINDSX', 'acs_data_db_path')
     log_db_path = ConfigProperty('WINDSX', 'log_db_path')
     windsx_path = ConfigProperty('WINDSX', 'root_path')
-    windsx_username = ConfigProperty('WINDSX', 'username')
-    windsx_password = ConfigProperty('WINDSX', 'password')
     windsx_acl = ConfigProperty('WINDSX', 'acl')
 
-    ingest_path = ConfigProperty('INGEST', 'root_path')
-    no_interaction_delay = ConfigProperty('INGEST', 'no_interaction_delay', transform=lambda x: int(x))
     ingester_api_key = ConfigProperty('INGEST', 'api_key')
     ingester_api_url = ConfigProperty('INGEST', 'api_url')
 
