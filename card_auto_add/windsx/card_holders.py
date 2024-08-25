@@ -6,12 +6,14 @@ from card_auto_add.windsx.database import Database
 class CardHolder(object):
     def __init__(self,
                  name_id,
+                 udf_id,
                  first_name,
                  last_name,
                  company,
                  card,
                  card_active):
         self.name_id = name_id
+        self.udf_id = udf_id
         self.first_name = first_name
         self.last_name = last_name
         self.company = company
@@ -56,6 +58,7 @@ class WinDSXActiveCardHolders(object):
             for row in rows:
                 card_holders.append(CardHolder(
                     name_id=row.NameId,
+                    udf_id=row.UdfId,
                     first_name=row.FirstName,
                     last_name=row.LastName,
                     company=row.CompanyName,

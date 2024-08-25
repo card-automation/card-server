@@ -40,4 +40,5 @@ class ActiveCardsWatcher(object):
             "last_name": card_holder.last_name,
             "card_num": card_holder.card,
             "company": card_holder.company,
+            "udf_id": card_holder.udf_id,
         }
