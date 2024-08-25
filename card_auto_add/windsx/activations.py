@@ -425,8 +425,8 @@ class WinDSXCardActivations(object):
         self._acs_db.connection.commit()
 
         self._log.info("Comm Server update requested")
-        for j in range(5):  # We'll endure up to 5 attempts, 4 resets
-            for i in range(30):  # We'll endure 30 * 10 == 300 seconds to wait for the update before resetting
+        for j in range(5):  # We'll endure up to 5 attempts
+            for i in range(18):  # We'll endure 18 * 10 == 180 seconds to wait for the update before resetting
                 downloading = self._acs_db.cursor.execute("SELECT FullDlFlag FROM LOC").fetchval()
 
                 if not downloading:
@@ -440,8 +440,7 @@ class WinDSXCardActivations(object):
             self._slack_log.info("Card update timed out, will attempt to reset and try again.")
             self._reset_card_access_hardware()
 
-            if j >= 1:
-                self._comm_server_watcher.restart_comm_server()
+            self._comm_server_watcher.restart_comm_server()
 
         self._log.info("Card update failed after too many attempts")
         self._slack_log.info("Card update failed after too many attempts")
