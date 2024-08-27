@@ -4,7 +4,8 @@ psutil
 pyinstaller
 pyodbc
 pysherplus
+pytest
 python-dateutil
 requests
-sentry-sdk==0.13.2
+sentry-sdk==1.14.0
 uuid
