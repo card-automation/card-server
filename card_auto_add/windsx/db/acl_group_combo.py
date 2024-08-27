@@ -54,6 +54,10 @@ class AclGroupCombo:
 
         return self._in_db
 
+    def __str__(self):
+        names = ", ".join(self.names)
+        return f"{self.id}: {names}"
+
     def _populate_from_db(self):
         name_id_rows = self._connection.execute(
             "SELECT AclGrpNameID FROM AclGrpCombo WHERE ComboID = ?",
