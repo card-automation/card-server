@@ -181,7 +181,7 @@ class WinDSXCardActivations(object):
         if not isinstance(card_num, str):
             card_num = str(card_num)
 
-        sql = "SELECT ID, AclGrpComboId FROM `CARDS` WHERE Code = ?"
+        sql = "SELECT ID, AclGrpComboId FROM CARDS WHERE Code = ?"
 
         self._acs_db.cursor.execute(sql, card_num.lstrip('0'))
         row = self._acs_db.cursor.fetchone()
@@ -316,11 +316,9 @@ class WinDSXCardActivations(object):
                 tz_to_dev_list[access.Tz3].add(access.Dev)
             if access.Tz4 != 0:
                 tz_to_dev_list[access.Tz4].add(access.Dev)
-
-        device_groups = list(self._acs_db.cursor.execute("SELECT * FROM DGRP").fetchall())
         tz_to_device_group = {}
         for tz, dev_list in tz_to_dev_list.items():
-            tz_to_device_group[tz] = self._find_or_create_matching_device_group(dev_list, device_groups)
+            tz_to_device_group[tz] = self._find_or_create_matching_device_group(dev_list)
 
         acls = set()
         for tz, device_group in tz_to_device_group.items():
@@ -328,7 +326,9 @@ class WinDSXCardActivations(object):
 
         return acls
 
-    def _find_or_create_matching_device_group(self, dev_list, device_groups):
+    def _find_or_create_matching_device_group(self, dev_list):
+        device_groups = list(self._acs_db.cursor.execute("SELECT * FROM DGRP").fetchall())
+
         for group in device_groups:
             valid_group = True
             for dev in range(128):
@@ -345,8 +345,8 @@ class WinDSXCardActivations(object):
 
         self._log.info("No valid device group found, creating one")
 
-        group_names = self._acs_db.cursor.execute("SELECT DGrp FROM DGRP").fetchall()
-        device_group = max([int(x.DGrp) for x in group_names if float.is_integer(x.DGrp)]) + 1  # Grab the next one
+        # Grab the next one by whatever the highest one is plus one.
+        new_device_group_num = max([int(x.DGrp) for x in device_groups if float.is_integer(x.DGrp)]) + 1
 
         sql = "INSERT INTO DGRP(DGrp, DlFlag, CkSum"
         for i in range(128):
@@ -357,12 +357,14 @@ class WinDSXCardActivations(object):
             sql += f", ?"
         sql += ")"
 
-        values = [device_group, 1, 0]
+        values = [new_device_group_num, 1, 0]
         for i in range(128):
             values.append(i in dev_list)
 
         self._acs_db.cursor.execute(sql, values)
         self._acs_db.connection.commit()
+
+        return new_device_group_num
 
     def _find_or_create_matching_acl(self, tz, device_group):
         acl = self._acs_db.cursor.execute("SELECT Acl FROM ACL WHERE Tz = ? AND DGrp = ?",
