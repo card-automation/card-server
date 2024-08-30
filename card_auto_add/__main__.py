@@ -48,7 +48,7 @@ comm_server_watcher.start()
 
 acs_db = Database(config.acs_data_db_path)
 log_db = Database(config.log_db_path)
-acs_data = AcsData(MicrosoftAccessDatabaseConnection(config.acs_data_db_path))
+acs_data = AcsData(MicrosoftAccessDatabaseConnection(config.acs_data_db_path), 3)  # TODO don't hardcode this
 
 card_activations = WinDSXCardActivations(config, acs_db, acs_data, comm_server_watcher)
 ingester = Ingester(config, card_activations, server_api)
@@ -66,7 +66,6 @@ door_overrides = DoorOverrideWatcher(config)
 door_overrides.start()
 
 config.slack_logger.info("denhac card access automation started")
-
 
 # @atexit.register
 # def goodbye():  # TODO Shut down all the threads

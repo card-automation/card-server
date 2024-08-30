@@ -161,4 +161,5 @@ def acs_data(
         table_acl_group_combo,
         table_acl_group
 ):
-    return AcsData(in_memory_sqlite)
+    location_group_id = 3  # Hardcoded for tests
+    return AcsData(in_memory_sqlite, location_group_id)

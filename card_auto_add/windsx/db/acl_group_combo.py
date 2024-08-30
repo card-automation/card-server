@@ -29,8 +29,10 @@ class AclGroupNameNotInDatabase(_AclGroupNameNotFound):
 class AclGroupCombo:
     def __init__(self,
                  connection: Connection,
+                 location_group_id: int,
                  combo_id: int
                  ):
+        self._location_group_id = location_group_id
         self._connection = connection
         self._combo_id = combo_id
         self._names: Optional[frozenset[[str]]] = None
@@ -153,11 +155,15 @@ class AclGroupCombo:
 
         for new_combo_id, value in grouped_by_combo_id:
             acl_name_ids = set([x[0] for x in value])
-            if acl_name_ids == wanted_name_ids:
-                return AclGroupCombo(self._connection, new_combo_id)  # Oh good, we found an exact match
+            if acl_name_ids == wanted_name_ids:  # Oh good, we found an exact match
+                return AclGroupCombo(
+                    self._connection,
+                    self._location_group_id,
+                    new_combo_id
+                )
 
         # This doesn't exist, so we create one, update the names manually, and mark it as not in the database
-        result = AclGroupCombo(self._connection, 0)
+        result = AclGroupCombo(self._connection, self._location_group_id, 0)
         result._names = all_names
         result._in_db = False
 
@@ -173,14 +179,12 @@ class AclGroupCombo:
         names_to_ids = self._name_ids_by_name(self._names)
         name_id_iterator = iter(names_to_ids.values())
 
-        loc_group = 3  # TODO Don't hardcode location group
-
         # We need to insert one of them to get a new combo id. The ID field gets a generated ID, which we treat as the
         # combo id for this AclGrpComboId
         with self._connection as conn:  # Scope a new cursor to avoid other cursors messing up our last row id
             conn.execute(
                 "INSERT INTO AclGrpCombo(AclGrpNameID, ComboID, LocGrp) VALUES (?, ?, ?)",
-                next(name_id_iterator), 0, loc_group
+                next(name_id_iterator), 0, self._location_group_id
             )
             self._combo_id = conn.last_row_id
 
@@ -194,7 +198,7 @@ class AclGroupCombo:
         # Now we just have to insert the rest of our rows
         self._connection.executemany(
             "INSERT INTO AclGrpCombo(AclGrpNameID, ComboID, LocGrp) VALUES (?, ?, ?)",
-            [(name_id, self._combo_id, loc_group) for name_id in name_id_iterator]
+            [(name_id, self._combo_id, self._location_group_id) for name_id in name_id_iterator]
         )
 
         self._in_db = True  # Now we're in the database :)
