@@ -17,6 +17,8 @@ from card_auto_add.windsx.activations import WinDSXCardActivations
 from card_auto_add.windsx.card_holders import WinDSXActiveCardHolders
 from card_auto_add.windsx.card_scan import WinDSXCardScan
 from card_auto_add.windsx.database import Database
+from card_auto_add.windsx.db.acs_data import AcsData
+from card_auto_add.windsx.db.connection.microsoft_access import MicrosoftAccessDatabaseConnection
 
 logger = logging.getLogger("card_access")
 logger.setLevel(logging.INFO)
@@ -46,8 +48,9 @@ comm_server_watcher.start()
 
 acs_db = Database(config.acs_data_db_path)
 log_db = Database(config.log_db_path)
+acs_data = AcsData(MicrosoftAccessDatabaseConnection(config.acs_data_db_path))
 
-card_activations = WinDSXCardActivations(config, acs_db, comm_server_watcher)
+card_activations = WinDSXCardActivations(config, acs_db, acs_data, comm_server_watcher)
 ingester = Ingester(config, card_activations, server_api)
 ingester.start()
 

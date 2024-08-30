@@ -11,6 +11,8 @@ from card_auto_add.config import Config
 from card_auto_add.data_signing import DataSigning
 from card_auto_add.loops.comm_server_watcher import CommServerWatcher
 from card_auto_add.windsx.database import Database
+from card_auto_add.windsx.db.acl_group_combo import AclGroupCombo
+from card_auto_add.windsx.db.acs_data import AcsData
 
 
 class CardInfo(object):
@@ -33,9 +35,11 @@ class WinDSXCardActivations(object):
     def __init__(self,
                  config: Config,
                  acs_db: Database,
+                 acs_data: AcsData,
                  comm_server_watcher: CommServerWatcher,
                  ):
         self._acs_db: Database = acs_db
+        self._acs_data = acs_data
         self._config: Config = config
         self._default_acl = config.windsx_acl
         self._log = config.logger
@@ -50,7 +54,7 @@ class WinDSXCardActivations(object):
         self._log.info(f"Activating card {card_info.card}")
         self._slack_log.info(f"Activating card {card_info.card} for {card_info.first_name} {card_info.last_name}")
 
-        acl_name_id = self._get_acl_by_name(self._default_acl)
+        to_add_group_combo: AclGroupCombo = self._acs_data.acl_group_combo.by_names(self._default_acl)
 
         name_id = self._find_or_create_name(card_info)
 
@@ -58,15 +62,18 @@ class WinDSXCardActivations(object):
 
         if card_id is None:
             # This should give us the card combo id with just our acl
-            card_combo_id = self._find_or_create_new_combo_id(None, acl_name_id)
+            card_combo_id = to_add_group_combo.id
             card_id = self._create_card(name_id, card_info.card, card_combo_id)
         else:
-            new_card_combo_id = self._get_card_combo_containing_acl(card_combo_id, acl_name_id)
+            existing_group_combo: AclGroupCombo = self._acs_data.acl_group_combo.by_id(card_combo_id)
+            new_group_combo: AclGroupCombo = existing_group_combo.with_names(to_add_group_combo.names)
 
-            if card_combo_id != new_card_combo_id:
-                self._log.info(f"Updating card combo id from {card_combo_id} to {new_card_combo_id}")
-                self._update_card_combo_id(card_id, new_card_combo_id)
-                card_combo_id = new_card_combo_id
+            # We check the DB just in case the existing card combo id is 0 but the new group is different
+            if not new_group_combo.in_db or card_combo_id != new_group_combo.id:
+                self._log.info(f"Updating card combo id from {card_combo_id} to {new_group_combo.id}")
+                new_group_combo.write()  # Make sure it's in the DB
+                self._update_card_combo_id(card_id, new_group_combo.id)
+                card_combo_id = new_group_combo.id
 
             self._set_card_active(card_id, name_id)
 
@@ -165,18 +172,6 @@ class WinDSXCardActivations(object):
 
         self._acs_db.connection.commit()
 
-    def _get_acl_by_name(self, acl_name):
-        sql = "SELECT ID FROM AclGrpName WHERE Name = ?"
-
-        self._acs_db.cursor.execute(sql, acl_name)
-        acl_name_id = self._acs_db.cursor.fetchval()
-
-        if acl_name_id is None:
-            raise ValueError(f"Could not find acl named {acl_name}")
-
-        self._log.info(f"Found ACL Name ID: {acl_name_id}")
-        return acl_name_id
-
     def _get_card_combo_id(self, card_num: Union[str, int]):
         if not isinstance(card_num, str):
             card_num = str(card_num)
@@ -195,58 +190,6 @@ class WinDSXCardActivations(object):
             self._log.info(f"Found card id {card_id} and combo id {card_combo_id} for card {card_num}")
 
             return card_id, card_combo_id
-
-    def _get_card_combo_containing_acl(self, card_combo_id, acl_name_id):
-        if self._combo_contains_name_id(card_combo_id, acl_name_id):
-            self._log.info(f"Acl combo id {card_combo_id} does contain desired acl name id {acl_name_id}")
-        else:
-            self._log.info(f"Acl combo id {card_combo_id} does not contain desired acl name id {acl_name_id}")
-            card_combo_id = self._find_or_create_new_combo_id(card_combo_id, acl_name_id)
-            self._log.info(f"New acl combo id: {card_combo_id}")
-
-        return card_combo_id
-
-    def _combo_contains_name_id(self, card_combo_id, acl_name_id):
-        sql = "SELECT AclGrpNameID FROM AclGrpCombo WHERE ComboID = ?"
-        name_ids = [x[0] for x in self._acs_db.cursor.execute(sql, card_combo_id)]
-
-        return acl_name_id in name_ids
-
-    def _find_or_create_new_combo_id(self, base_card_combo_id: Optional[int], acl_name_id):
-        if base_card_combo_id is None:
-            known_name_ids = set()
-        else:
-            sql = "SELECT AclGrpNameID FROM AclGrpCombo WHERE ComboID = ?"
-            known_name_ids = set([x[0] for x in self._acs_db.cursor.execute(sql, base_card_combo_id)])
-
-        known_name_ids.add(acl_name_id)
-
-        acl_combos = list(self._acs_db.cursor.execute("SELECT AclGrpNameID, ComboID FROM AclGrpCombo"))
-        grouped_by_combo_id = groupby(acl_combos, lambda x: x.ComboID)
-
-        for new_combo_id, value in grouped_by_combo_id:
-            acl_name_ids = set([x[0] for x in value])
-            if acl_name_ids == known_name_ids:
-                return new_combo_id
-
-        self._log.info("We didn't find a valid combo id, will create one.")
-
-        # Let's start by inserting a group combo without a known combo id to create and retrieve our new combo id
-        self._acs_db.cursor.execute(
-            "INSERT INTO AclGrpCombo(AclGrpNameID, LocGrp) VALUES (?, ?)",
-            (acl_name_id, self._loc_grp)
-        )
-
-        new_combo_id = self._acs_db.cursor.execute("SELECT @@IDENTITY").fetchval()
-        for name_id in known_name_ids:
-            self._acs_db.cursor.execute(
-                "INSERT INTO AclGrpCombo(AclGrpNameID, ComboID, LocGrp) VALUES (?, ?, ?)",
-                (name_id, new_combo_id, self._loc_grp)
-            )
-
-        self._acs_db.connection.commit()
-
-        return new_combo_id
 
     def _create_card(self, name_id, card_num, card_combo_id):
         # This function assumes that you're creating a card to be activated, so it sets the start/stop date and status
@@ -274,14 +217,14 @@ class WinDSXCardActivations(object):
 
     def _update_card_combo_id(self, card_id, new_card_combo_id):
         self._acs_db.cursor.execute(
-            "UPDATE CARDS SET AclGrpComboID = ?, DlFlag = 0 WHERE ID = ?",
+            "UPDATE CARDS SET AclGrpComboID = ?, DlFlag = 1 WHERE ID = ?",
             (new_card_combo_id, card_id)
         )
         self._acs_db.connection.commit()
 
     def _set_card_active(self, card_id, name_id):
         self._acs_db.cursor.execute(
-            "UPDATE CARDS SET NameID = ?, StartDate = ?, StopDate = ?, DlFlag = 0, Status = True WHERE ID = ?",
+            "UPDATE CARDS SET NameID = ?, StartDate = ?, StopDate = ?, DlFlag = 1, Status = True WHERE ID = ?",
             (name_id, datetime.now(), self._date_never, card_id)
         )
         self._acs_db.connection.commit()
@@ -289,7 +232,7 @@ class WinDSXCardActivations(object):
     def _set_card_inactive(self, card_id):
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         self._acs_db.cursor.execute(
-            "UPDATE CARDS SET StopDate = ?, DlFlag = 0, Status = False WHERE ID = ?",
+            "UPDATE CARDS SET StopDate = ?, DlFlag = 1, Status = False WHERE ID = ?",
             (today, card_id)
         )
 
@@ -418,8 +361,6 @@ class WinDSXCardActivations(object):
         self._acs_db.connection.commit()
 
     def _encourage_system_update(self):
-        self._acs_db.cursor.execute("UPDATE DEV SET DlFlag=1, CkSum=0")
-        self._acs_db.cursor.execute("UPDATE IO SET DlFlag=1")
         self._acs_db.cursor.execute(
             "UPDATE LOC SET PlFlag=True, DlFlag=1, FullDlFlag=True, NodeCs=0, CodeCs=0, AclCs=0, DGrpCs=0"
         )
