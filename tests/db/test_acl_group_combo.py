@@ -162,4 +162,4 @@ class TestAclGroupCombo:
         assertions(109, frozenset({self._tenant_2}))
         assertions(110, frozenset({self._tenant_3}))
 
-    # TODO Figure out how we're going to support custom Loc Grp instead of hardcoding it
+    # TODO test lookup by id not found
