@@ -51,18 +51,13 @@ class Company:
         return self._in_db
 
     def _populate_from_db(self):
-        if self._company_id == 0:
-            self._in_db = False
-            self._name = self._name or ''
-            return
-
         company_row = self._connection.execute(
             "SELECT Name FROM COMPANY WHERE Company = ?",
             self._company_id
         ).fetchone()
 
         if company_row is None:
-            self._name = ''
+            self._name = self._name or ''
             self._in_db = False
         else:
             self._name = company_row[0]

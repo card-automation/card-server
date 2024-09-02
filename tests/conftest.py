@@ -150,22 +150,39 @@ def table_company(in_memory_sqlite: SqliteConnection, table_location_group):
         (12, location_group_id, 2, "Security Company"),
         (13, location_group_id, 3, "Tenant 1"),
         (14, location_group_id, 4, "Tenant 2"),
-        (15, location_group_id, 5, "Tenant 2"),
+        (15, location_group_id, 5, "Tenant 3"),
     ]
     values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
     in_memory_sqlite.executemany(f"INSERT INTO COMPANY VALUES({values_question_marks})", rows)
 
 
-# TODO Table CARDS (Needs NAMES, AclGrpCombo)
+@pytest.fixture
+def table_names(in_memory_sqlite: SqliteConnection, table_location_group, table_company):
+    in_memory_sqlite.execute("CREATE TABLE NAMES(ID INTEGER PRIMARY KEY, LocGrp, FName, LName, Company)")
+
+    rows = [
+        (1, location_group_id, "BobThe", "BuildingManager", 1),
+        (2, location_group_id, "Fire", "Key", 1),
+        (3, location_group_id, "Ray", "Securitay", 2),
+        (4, location_group_id, "Best", "Employee", 3),
+        (5, location_group_id, "Worst", "Employee", 3),
+        (6, location_group_id, "Best", "Employee", 4),  # Same name, different company
+        (7, location_group_id, "ToBe", "Fired", 4),
+        # Tenant 3 intentionally has no employees listed here so we can insert them in the unit test and just assert on
+        # count by company
+    ]
+    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
+    in_memory_sqlite.executemany(f"INSERT INTO NAMES VALUES({values_question_marks})", rows)
+
+
+# TODO Table CARDS
 # TODO Table UdfName
 # TODO Table UDF (Needs UdfName)
 # TODO Table AclGrpCombo
 # TODO Table DGRP
 # TODO Table ACL (Needs DGRP)
 # TODO Table LocCards (Needs CARDS, ACL)
-# TODO Table COMPANY
 
-# TODO Table NAMES (Needs COMPANY)
 # TODO OLL
 # TODO Table IO
 # TODO OllName
@@ -176,6 +193,7 @@ def acs_data(
         in_memory_sqlite: SqliteConnection,
         table_acl_group_combo,
         table_acl_group,
-        table_company
+        table_names
 ):
+    # Tables that would be generated indirectly are not included, by convention
     return AcsData(in_memory_sqlite, location_group_id)
