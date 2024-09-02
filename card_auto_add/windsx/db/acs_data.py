@@ -33,7 +33,10 @@ class CompanyDSL:
 
     def by_name(self, name: str) -> Company:
         # TODO Should filter on location group
-        company_row = self._connection.execute("SELECT Company FROM COMPANY WHERE Name = ?", name).fetchone()
+        company_row = self._connection.execute(
+            "SELECT ID FROM COMPANY WHERE Name = ? AND LocGrp = ?",
+            name, self._location_group_id
+        ).fetchone()
         if company_row is None:
             company = Company(self._connection, self._location_group_id, 0)
             company.name = name
@@ -42,8 +45,22 @@ class CompanyDSL:
 
         return company
 
-    def by_id(self, company_id: int) -> Company:
-        return Company(self._connection, self._location_group_id, company_id)
+    def by_id(self, _id: int) -> Company:
+        return Company(self._connection, self._location_group_id, _id)
+
+    def by_company(self, company_id: int) -> Company:
+        company_row = self._connection.execute(
+            "SELECT ID FROM COMPANY WHERE Company = ? AND LocGrp = ?",
+            company_id, self._location_group_id
+        ).fetchone()
+
+        if company_row is None:
+            company = Company(self._connection, self._location_group_id, 0)
+            company.company_id = company_id
+        else:
+            company = Company(self._connection, self._location_group_id, company_row[0])
+
+        return company
 
 
 class NamesDSL:

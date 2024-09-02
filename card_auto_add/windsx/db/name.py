@@ -92,14 +92,20 @@ class Name:
             )
 
         self._company_id = value
+        # TODO self._company = None
 
     @property
     def company(self) -> Optional[Company]:
         if self._company is None:
-            if self.company_id == 0:
-                return None
+            company_row = self._connection.execute(
+                "SELECT ID FROM COMPANY WHERE Company = ? AND LocGrp = ?",
+                self._company_id, self._location_group_id
+            ).fetchone()
 
-            self._company = Company(self._connection, self._location_group_id, self.company_id)
+            if company_row is None:
+                return None
+            else:
+                self._company = Company(self._connection, self._location_group_id, company_row[0])
 
         return self._company
 
@@ -111,11 +117,11 @@ class Name:
 
             self._connection.execute(
                 "UPDATE NAMES SET Company = ? WHERE ID = ?",
-                value.id, self._name_id
+                value.company, self._name_id
             )
 
         self._company = value
-        self._company_id = value.id
+        self._company_id = value.company
 
     @property
     def in_db(self) -> bool:

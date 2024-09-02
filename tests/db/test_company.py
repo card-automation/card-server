@@ -9,7 +9,8 @@ class TestCompany:
     def test_by_name(self, acs_data: AcsData):
         company: Company = acs_data.company.by_name("Security Company")
 
-        assert company.id == 2
+        assert company.id == 12
+        assert company.company == 2
         assert company.name == "Security Company"
         assert company.in_db
 
@@ -17,6 +18,7 @@ class TestCompany:
         company: Company = acs_data.company.by_name("Blorgh")
 
         assert company.id == 0
+        assert company.company == 0
         assert company.name == "Blorgh"
         assert not company.in_db
 
@@ -28,13 +30,15 @@ class TestCompany:
         company.write()
 
         assert company.in_db
-        assert company.id == 6  # Last one in the list + 1
+        assert company.id == 16  # Auto generated
+        assert company.company == 6  # Last one in the list + 1 (we generated)
         assert company.name == "Blorgh"
 
     def test_by_id(self, acs_data: AcsData):
-        company: Company = acs_data.company.by_id(3)
+        company: Company = acs_data.company.by_id(13)
 
-        assert company.id == 3
+        assert company.id == 13
+        assert company.company == 3
         assert company.name == "Tenant 1"
         assert company.in_db
 
@@ -42,17 +46,18 @@ class TestCompany:
         company: Company = acs_data.company.by_id(99)
 
         assert company.id == 99
+        assert company.company == 0
         assert company.name == ''
         assert not company.in_db
 
     def test_changing_name_when_in_db_updates_db(self, acs_data: AcsData):
-        company: Company = acs_data.company.by_id(1)
+        company: Company = acs_data.company.by_id(11)
         # We know this is in the DB, but we don't check here to make sure the code verifies first
 
         company.name = "New Company Name"
 
         # Fetch the company fresh from the DB and check the name
-        fresh_company: Company = acs_data.company.by_id(1)
+        fresh_company: Company = acs_data.company.by_id(11)
 
         assert fresh_company.name == "New Company Name"
 
@@ -68,7 +73,7 @@ class TestCompany:
         assert fresh_company.name == ""
 
     def test_cannot_update_to_empty_company_name(self, acs_data: AcsData):
-        company: Company = acs_data.company.by_id(1)
+        company: Company = acs_data.company.by_id(11)
         # This company exists, but giving it an empty name should throw an exception when writing
 
         with pytest.raises(CompanyNameCannotBeEmpty):

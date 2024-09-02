@@ -19,7 +19,7 @@ class TestName:
         assert name.last_name == "Securitay"
         assert name.company_id == 2
         assert name.company is not None
-        assert name.company.id == 2
+        assert name.company.company == 2
         assert name.in_db
 
     def test_cannot_retrieve_missing_by_first_and_last_name(self, acs_data: AcsData):
@@ -35,7 +35,7 @@ class TestName:
         assert name.last_name == "Key"
         assert name.company_id == 1
         assert name.company is not None
-        assert name.company.id == 1
+        assert name.company.company == 1
         assert name.in_db
 
     @staticmethod
@@ -64,7 +64,7 @@ class TestName:
         assert best_employee.last_name == "Employee"
         assert best_employee.company_id == 4
         assert best_employee.company is not None
-        assert best_employee.company.id == 4
+        assert best_employee.company.company == 4
         assert best_employee.in_db
 
         to_be_fired: Optional[Name] = next((n for n in names if n.id == 7), None)
@@ -74,7 +74,7 @@ class TestName:
         assert to_be_fired.last_name == "Fired"
         assert to_be_fired.company_id == 4
         assert to_be_fired.company is not None
-        assert to_be_fired.company.id == 4
+        assert to_be_fired.company.company == 4
         assert to_be_fired.in_db
 
     def test_updating_first_name_updates_when_in_db(self, acs_data: AcsData):
@@ -91,7 +91,7 @@ class TestName:
         assert fresh_name.last_name == "Employee"
         assert fresh_name.company_id == 3
         assert fresh_name.company is not None
-        assert fresh_name.company.id == 3
+        assert fresh_name.company.company == 3
         assert fresh_name.in_db
 
     def test_updating_last_name_updates_when_in_db(self, acs_data: AcsData):
@@ -108,7 +108,7 @@ class TestName:
         assert fresh_name.last_name == "Person"
         assert fresh_name.company_id == 3
         assert fresh_name.company is not None
-        assert fresh_name.company.id == 3
+        assert fresh_name.company.company == 3
         assert fresh_name.in_db
 
     def test_updating_company_id_updates_when_in_db(self, acs_data: AcsData):
@@ -125,14 +125,14 @@ class TestName:
         assert fresh_name.last_name == "Employee"
         assert fresh_name.company_id == 4
         assert fresh_name.company is not None
-        assert fresh_name.company.id == 4
+        assert fresh_name.company.company == 4
         assert fresh_name.in_db
 
     def test_updating_company_updates_when_in_db(self, acs_data: AcsData):
         name: Name = acs_data.names.by_id(5)
         # We know this is in the DB, but we don't check here to make sure the code verifies first
 
-        name.company = acs_data.company.by_id(4)
+        name.company = acs_data.company.by_id(14)
 
         # Fetch the name fresh from the DB
         fresh_name: Name = acs_data.names.by_id(5)
@@ -142,7 +142,7 @@ class TestName:
         assert fresh_name.last_name == "Employee"
         assert fresh_name.company_id == 4
         assert fresh_name.company is not None
-        assert fresh_name.company.id == 4
+        assert fresh_name.company.company == 4
         assert fresh_name.in_db
 
     def test_updating_first_name_does_not_update_when_not_in_db(self, acs_data: AcsData):
@@ -190,7 +190,7 @@ class TestName:
         assert name.last_name == ""
         assert name.company_id == 4
         assert name.company is not None
-        assert name.company.id == 4
+        assert name.company.company == 4
         assert not name.in_db
 
         # Fetch the name fresh from the DB
@@ -201,7 +201,7 @@ class TestName:
         name: Name = acs_data.names.by_id(99)
         # We know this is in the DB, but we don't check here to make sure the code verifies first
 
-        new_company = acs_data.company.by_id(4)
+        new_company = acs_data.company.by_id(14)
         name.company = new_company
 
         assert name.id == 99
