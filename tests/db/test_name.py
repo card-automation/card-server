@@ -3,7 +3,8 @@ from typing import List, Optional
 import pytest
 
 from card_auto_add.windsx.db.acs_data import AcsData
-from card_auto_add.windsx.db.name import Name, FieldValueInvalid
+from card_auto_add.windsx.db.model import FieldValueInvalid
+from card_auto_add.windsx.db.name import Name
 from tests.conftest import acs_data
 
 

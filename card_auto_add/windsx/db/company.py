@@ -1,10 +1,7 @@
 from typing import Optional
 
 from card_auto_add.windsx.db.connection.connection import Connection
-
-
-class CompanyNameCannotBeEmpty(Exception):
-    pass
+from card_auto_add.windsx.db.model import FieldValueInvalid
 
 
 class Company:
@@ -35,7 +32,7 @@ class Company:
     def name(self, value: str) -> None:
         if self.in_db:
             if len(value) == 0:
-                raise CompanyNameCannotBeEmpty("Cannot update the company name to be empty in the database")
+                raise FieldValueInvalid("Cannot update the company name to be empty in the database", "company")
 
             self._connection.execute(
                 "UPDATE COMPANY SET Name = ? WHERE ID = ?",
@@ -55,7 +52,7 @@ class Company:
     def company(self, value: int) -> None:
         if self.in_db:
             if value == 0:
-                raise CompanyNameCannotBeEmpty("Cannot update the company to be empty in the database")
+                raise FieldValueInvalid("Cannot update the company to be empty in the database", "name")
 
             self._connection.execute(
                 "UPDATE COMPANY SET Company = ? WHERE ID = ?",
@@ -91,7 +88,7 @@ class Company:
             return
 
         if len(self._name) == 0:
-            raise CompanyNameCannotBeEmpty("Cannot insert empty company name into the database")
+            raise FieldValueInvalid("Cannot insert empty company name into the database", "name")
 
         existing_company_rows = self._connection.execute("SELECT Company FROM COMPANY").fetchall()
         self._company_id = max([int(row[0]) for row in existing_company_rows]) + 1

@@ -1,7 +1,8 @@
 import pytest
 
 from card_auto_add.windsx.db.acs_data import AcsData
-from card_auto_add.windsx.db.company import Company, CompanyNameCannotBeEmpty
+from card_auto_add.windsx.db.company import Company
+from card_auto_add.windsx.db.model import FieldValueInvalid
 from tests.conftest import acs_data
 
 
@@ -76,8 +77,10 @@ class TestCompany:
         company: Company = acs_data.company.by_id(11)
         # This company exists, but giving it an empty name should throw an exception when writing
 
-        with pytest.raises(CompanyNameCannotBeEmpty):
+        with pytest.raises(FieldValueInvalid) as ex:
             company.name = ''
+
+        assert ex.value.field_name == "name"
 
     def test_cannot_write_empty_company_name(self, acs_data: AcsData):
         company: Company = acs_data.company.by_name('')
@@ -85,5 +88,7 @@ class TestCompany:
         assert not company.in_db
         assert company.name == ''
 
-        with pytest.raises(CompanyNameCannotBeEmpty):
+        with pytest.raises(FieldValueInvalid) as ex:
             company.write()
+
+        assert ex.value.field_name == "name"
