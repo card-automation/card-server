@@ -32,7 +32,7 @@ class Company:
     def name(self, value: str) -> None:
         if self.in_db:
             if len(value) == 0:
-                raise FieldValueInvalid("Cannot update the company name to be empty in the database", "company")
+                raise FieldValueInvalid("Cannot update the company name to be empty in the database", "name")
 
             self._connection.execute(
                 "UPDATE COMPANY SET Name = ? WHERE ID = ?",
