@@ -3,6 +3,8 @@ from pathlib import Path
 from sqlite3 import Cursor
 from typing import Union, Any, Iterable, Optional
 
+from sqlalchemy import create_engine
+
 from card_auto_add.windsx.db.connection.connection import Connection
 
 
@@ -11,6 +13,9 @@ class SqliteConnection(Connection):
         connection = sqlite3.connect(db_path)
         connection.autocommit = True
         self._cursor = connection.cursor()
+
+        engine = create_engine(f"sqlite:///{db_path}")
+        super().__init__(engine)
 
     def execute(self, sql, *params) -> Cursor:
         return self._cursor.execute(sql, params)

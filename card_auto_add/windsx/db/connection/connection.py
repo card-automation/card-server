@@ -1,6 +1,8 @@
 import abc
 from typing import Iterable, Any, Optional, Protocol, List, Tuple
 
+from sqlalchemy import Engine
+
 
 # This is to allow type hinting to work as expected given the cursor classes we use don't have a common ancestor
 class CursorExecuteResult(Protocol):
@@ -16,6 +18,13 @@ class CursorExecuteResult(Protocol):
 
 
 class Connection(abc.ABC):
+    def __init__(self, engine: Engine):
+        self._engine = engine
+
+    @property
+    def engine(self) -> Engine:
+        return self._engine
+
     @abc.abstractmethod
     def execute(self, sql, *params) -> CursorExecuteResult:
         """

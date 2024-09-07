@@ -33,6 +33,18 @@ be useful. Columns we'll never use in our application aren't included as a gener
 
 
 @pytest.fixture
+def table_location_group(in_memory_sqlite: SqliteConnection):
+    in_memory_sqlite.execute(
+        "CREATE TABLE LocGrp(ID INTEGER PRIMARY KEY, LocGrp, Name)")
+
+    rows = [
+        (1, location_group_id, "MBD")
+    ]
+    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
+    in_memory_sqlite.executemany(f"INSERT INTO LocGrp VALUES({values_question_marks})", rows)
+
+
+@pytest.fixture
 def table_location(in_memory_sqlite: SqliteConnection, table_location_group):
     in_memory_sqlite.execute(
         "CREATE TABLE LOC(ID INTEGER PRIMARY KEY, Loc, LocGrp, Name, Status, PlFlag, FullDlFlag, LoFlag, NodeCs, OGrpCs, HolCs, FacilCs, OllCs, TzCs, AclCs, DGrpCs, CodeCs, DlFlag)"
@@ -43,18 +55,6 @@ def table_location(in_memory_sqlite: SqliteConnection, table_location_group):
     ]
     values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
     in_memory_sqlite.executemany(f"INSERT INTO LOC VALUES({values_question_marks})", rows)
-
-
-@pytest.fixture
-def table_location_group(in_memory_sqlite: SqliteConnection):
-    in_memory_sqlite.execute(
-        "CREATE TABLE LocGrp(ID INTEGER PRIMARY KEY, LocGrp, Name)")
-
-    rows = [
-        (1, location_group_id, "MBD")
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO LocGrp VALUES({values_question_marks})", rows)
 
 
 @pytest.fixture

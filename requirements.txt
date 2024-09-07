@@ -8,4 +8,6 @@ pytest
 python-dateutil
 requests
 sentry-sdk==1.14.0
+SQLAlchemy
+sqlalchemy-access
 uuid
