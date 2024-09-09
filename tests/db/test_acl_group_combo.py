@@ -1,11 +1,13 @@
 from typing import List
 
 import pytest
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.acl_group_combo import AclGroupCombo, AclGroupNameNotInCombo, AclGroupNameNotInDatabase
-from card_auto_add.windsx.db.acs_data import AcsData
-from card_auto_add.windsx.db.connection.sqlite import SqliteConnection
-from tests.conftest import acs_data
+from card_auto_add.windsx.db.acl_group_combo import AclGroupComboSet, AclGroupNameNotInCombo, AclGroupNameNotInDatabase, \
+    AclGroupComboHelper
+from card_auto_add.windsx.db.models import AclGrpCombo
+from tests.conftest import acs_data_engine, location_group_id
 
 
 class TestAclGroupCombo:
@@ -20,46 +22,50 @@ class TestAclGroupCombo:
     _tenant_2 = "Tenant 2"
     _tenant_3 = "Tenant 3"
 
-    def test_empty(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.empty()
+    @pytest.fixture
+    def acl_group_combo_helper(self, acs_data_engine: Engine) -> AclGroupComboHelper:
+        return AclGroupComboHelper(acs_data_engine, location_group_id)
+
+    def test_empty(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.empty()
         assert acl_group_combo.id == 0
         assert acl_group_combo.names == frozenset()
         assert not acl_group_combo.in_db
 
-    def test_lookup_by_id(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_id(106)
+    def test_lookup_by_id(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_id(106)
         assert acl_group_combo.id == 106
         assert acl_group_combo.names == frozenset({self._tenant_3, self._main_building_access})
         assert acl_group_combo.in_db
 
-    def test_lookup_by_name(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_names(self._tenant_1)
+    def test_lookup_by_name(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_names(self._tenant_1)
         assert acl_group_combo.id == 108
         assert acl_group_combo.names == frozenset({self._tenant_1})
         assert acl_group_combo.in_db
 
-    def test_lookup_by_names(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_names(self._main_building_access, self._tenant_1)
+    def test_lookup_by_names(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_names(self._main_building_access, self._tenant_1)
         assert acl_group_combo.id == 102
         assert acl_group_combo.names == frozenset({self._tenant_1, self._main_building_access})
         assert acl_group_combo.in_db
 
-    def test_by_name_that_is_not_in_our_names_table(self, acs_data: AcsData):
+    def test_by_name_that_is_not_in_our_names_table(self, acl_group_combo_helper: AclGroupComboHelper):
         invalid_name = "Blorgh"
 
         with pytest.raises(AclGroupNameNotInDatabase) as ex:
-            acs_data.acl_group_combo.by_names(invalid_name)
+            acl_group_combo_helper.by_names(invalid_name)
 
         assert ex.value.missing_name == invalid_name
 
-    def test_lookup_by_name_with_group_that_does_not_exist(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_names(self._tenant_1, self._tenant_2)
+    def test_lookup_by_name_with_group_that_does_not_exist(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_names(self._tenant_1, self._tenant_2)
         assert acl_group_combo.id == 0
         assert acl_group_combo.names == frozenset({self._tenant_1, self._tenant_2})
         assert not acl_group_combo.in_db
 
-    def test_writing_non_existent_acl_combo_to_db(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_names(self._tenant_1, self._tenant_2)
+    def test_writing_non_existent_acl_combo_to_db(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_names(self._tenant_1, self._tenant_2)
         assert not acl_group_combo.in_db
 
         acl_group_combo.write()
@@ -69,64 +75,66 @@ class TestAclGroupCombo:
         assert acl_group_combo.in_db
 
         # Now to make sure we would generate the same acl group combo based on the id:
-        new_acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_id(acl_group_combo.id)
+        new_acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_id(acl_group_combo.id)
         assert new_acl_group_combo.id == acl_group_combo.id
         assert new_acl_group_combo.names == acl_group_combo.names
         assert new_acl_group_combo.in_db == acl_group_combo.in_db
 
-    def test_nothing_writes_if_in_db_already(self, in_memory_sqlite: SqliteConnection, acs_data: AcsData):
-        starting_rows = in_memory_sqlite.execute("SELECT * FROM AclGrpCombo").fetchall()
+    def test_nothing_writes_if_in_db_already(self, acs_data_engine: Engine, acl_group_combo_helper: AclGroupComboHelper):
+        session = Session(acs_data_engine)
+        starting_rows = session.execute(select(AclGrpCombo)).all()
 
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_names(self._tenant_1)
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_names(self._tenant_1)
         # We know this one is in the db, but we don't want to check it here to make sure our code checks it in write
 
         acl_group_combo.write()
 
-        ending_rows = in_memory_sqlite.execute("SELECT * FROM AclGrpCombo").fetchall()
+        ending_rows = session.execute(select(AclGrpCombo)).all()
 
         assert starting_rows == ending_rows
 
-    def test_nothing_writes_if_empty(self, in_memory_sqlite: SqliteConnection, acs_data: AcsData):
-        starting_rows = in_memory_sqlite.execute("SELECT * FROM AclGrpCombo").fetchall()
+    def test_nothing_writes_if_empty(self, acs_data_engine: Engine, acl_group_combo_helper: AclGroupComboHelper):
+        session = Session(acs_data_engine)
+        starting_rows = session.execute(select(AclGrpCombo)).all()
 
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.empty()
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.empty()
 
         acl_group_combo.write()
 
-        ending_rows = in_memory_sqlite.execute("SELECT * FROM AclGrpCombo").fetchall()
+        ending_rows = session.execute(select(AclGrpCombo)).all()
 
         assert starting_rows == ending_rows
 
-    def test_using_with_method_to_get_new_combos(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_id(101)  # Main building by itself
+    def test_using_with_method_to_get_new_combos(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_id(101)  # Main building by itself
         # We intentionally don't check names or in_db on acl_group_combo to make sure our code does it on our behalf
-        new_acl_group_combo: AclGroupCombo = acl_group_combo.with_names("Tenant 2")
+        new_acl_group_combo: AclGroupComboSet = acl_group_combo.with_names("Tenant 2")
 
         assert new_acl_group_combo.id == 104  # Main building + Tenant 2
         assert new_acl_group_combo.names == frozenset({self._main_building_access, self._tenant_2})
         assert new_acl_group_combo.in_db
 
-    def test_using_without_method_to_get_new_combos(self, acs_data: AcsData):
+    def test_using_without_method_to_get_new_combos(self, acl_group_combo_helper: AclGroupComboHelper):
         # This is essentially the inverse of the test test_using_with_method_to_get_new_combos
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_id(104)  # Main building + Tenant 2
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_id(104)  # Main building + Tenant 2
         # We intentionally don't check names or in_db on acl_group_combo to make sure our code does it on our behalf
-        new_acl_group_combo: AclGroupCombo = acl_group_combo.without_names("Tenant 2")
+        new_acl_group_combo: AclGroupComboSet = acl_group_combo.without_names("Tenant 2")
 
         assert new_acl_group_combo.id == 101
         assert new_acl_group_combo.names == frozenset({self._main_building_access})
         assert new_acl_group_combo.in_db
 
-    def test_using_without_method_to_remove_all_names(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_id(101)  # Main building by itself
+    def test_using_without_method_to_remove_all_names(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_id(101)  # Main building by itself
 
-        new_acl_group_combo: AclGroupCombo = acl_group_combo.without_names(self._main_building_access)
+        new_acl_group_combo: AclGroupComboSet = acl_group_combo.without_names(self._main_building_access)
 
         assert new_acl_group_combo.id == 0
         assert new_acl_group_combo.names == frozenset()
         assert not new_acl_group_combo.in_db
 
-    def test_without_removing_a_name_that_is_not_in_our_table(self, acs_data: AcsData):
-        acl_group_combo: AclGroupCombo = acs_data.acl_group_combo.by_id(101)  # Main building by itself
+    def test_without_removing_a_name_that_is_not_in_our_table(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_id(101)  # Main building by itself
 
         invalid_name = "Blorgh"
         with pytest.raises(AclGroupNameNotInCombo) as ex:
@@ -134,8 +142,8 @@ class TestAclGroupCombo:
 
         assert ex.value.missing_name == invalid_name
 
-    def test_retrieving_all_group_combos(self, acs_data: AcsData):
-        all_combos: List[AclGroupCombo] = acs_data.acl_group_combo.all()
+    def test_retrieving_all_group_combos(self, acl_group_combo_helper: AclGroupComboHelper):
+        all_combos: List[AclGroupComboSet] = acl_group_combo_helper.all()
 
         assert len(all_combos) == 8  # Update this value and add entries below if you add new entries in conftest.py
 

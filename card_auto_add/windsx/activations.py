@@ -11,7 +11,7 @@ from card_auto_add.config import Config
 from card_auto_add.data_signing import DataSigning
 from card_auto_add.loops.comm_server_watcher import CommServerWatcher
 from card_auto_add.windsx.database import Database
-from card_auto_add.windsx.db.acl_group_combo import AclGroupCombo
+from card_auto_add.windsx.db.acl_group_combo import AclGroupComboSet
 from card_auto_add.windsx.db.acs_data import AcsData
 
 
@@ -54,7 +54,7 @@ class WinDSXCardActivations(object):
         self._log.info(f"Activating card {card_info.card}")
         self._slack_log.info(f"Activating card {card_info.card} for {card_info.first_name} {card_info.last_name}")
 
-        to_add_group_combo: AclGroupCombo = self._acs_data.acl_group_combo.by_names(self._default_acl)
+        to_add_group_combo: AclGroupComboSet = self._acs_data.acl_group_combo.by_names(self._default_acl)
 
         name_id = self._find_or_create_name(card_info)
 
@@ -65,8 +65,8 @@ class WinDSXCardActivations(object):
             card_combo_id = to_add_group_combo.id
             card_id = self._create_card(name_id, card_info.card, card_combo_id)
         else:
-            existing_group_combo: AclGroupCombo = self._acs_data.acl_group_combo.by_id(card_combo_id)
-            new_group_combo: AclGroupCombo = existing_group_combo.with_names(to_add_group_combo.names)
+            existing_group_combo: AclGroupComboSet = self._acs_data.acl_group_combo.by_id(card_combo_id)
+            new_group_combo: AclGroupComboSet = existing_group_combo.with_names(to_add_group_combo.names)
 
             # We check the DB just in case the existing card combo id is 0 but the new group is different
             if not new_group_combo.in_db or card_combo_id != new_group_combo.id:

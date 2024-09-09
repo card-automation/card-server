@@ -1,19 +1,13 @@
-from unittest.mock import MagicMock
-
 import pytest
+from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.acs_data import AcsData
-from card_auto_add.windsx.db.connection.sqlite import SqliteConnection
-
+from card_auto_add.windsx.db.engine_factory import EngineFactory
+from card_auto_add.windsx.db.models import *
 
 location_group_id = 3
 main_location_id = 3
 annex_location_id = 4
-
-@pytest.fixture
-def in_memory_sqlite():
-    return SqliteConnection(':memory:')
-
 
 """
 The table data is relatively hard coded to be used in the tests, but it's useful to explain the overall decisions.
@@ -32,147 +26,157 @@ be useful. Columns we'll never use in our application aren't included as a gener
 """
 
 
-@pytest.fixture
-def table_location_group(in_memory_sqlite: SqliteConnection):
-    in_memory_sqlite.execute(
-        "CREATE TABLE LocGrp(ID INTEGER PRIMARY KEY, LocGrp, Name)")
-
-    rows = [
-        (1, location_group_id, "MBD")
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO LocGrp VALUES({values_question_marks})", rows)
+def table_location_group(session: Session):
+    session.add_all([
+        LocGrp(ID=1, LocGrp=location_group_id, Name="MBD")
+    ])
 
 
-@pytest.fixture
-def table_location(in_memory_sqlite: SqliteConnection, table_location_group):
-    in_memory_sqlite.execute(
-        "CREATE TABLE LOC(ID INTEGER PRIMARY KEY, Loc, LocGrp, Name, Status, PlFlag, FullDlFlag, LoFlag, NodeCs, OGrpCs, HolCs, FacilCs, OllCs, TzCs, AclCs, DGrpCs, CodeCs, DlFlag)"
-    )
-
-    rows = [
-        (1, main_location_id, location_group_id, "MBD", True, False, False, False, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO LOC VALUES({values_question_marks})", rows)
-
-
-@pytest.fixture
-def table_timezone(in_memory_sqlite: SqliteConnection, table_location):
-    in_memory_sqlite.execute(
-        "CREATE TABLE TZ(ID INTEGER PRIMARY KEY, Loc, TZ, Name, LinkStatus, SunStart, SunStop, MonStart, MonStop, TueStart, TueStop, WedStart, WedStop, ThuStart, ThuStop, FriStart, FriStop, SatStart, SatStop, Hol1Start, Hol1Stop, Hol2Start, Hol2Stop, Hol3Start, Hol3Stop, DlFlag, Notes, CkSum)")
-
-    rows = [
-        (-659436830, main_location_id, 1, "Always(24x7)", 0, 0, 2400, 0, 2400, 0, 2400, 0, 2400, 0, 2400, 0, 2400, 0, 2400, 0, 2400, 0, 2400, 0, 2400, 0, "", 19202),
-        (-1576553029, main_location_id, 2, "Front Door Auto Unlock", 1, 1300, 945, 1400, 1100, 1400, 1100, 1400, 1100, 1400, 1100, 1400, 1100, 2300, 1930, 0, 2400, 0, 2400, 0, 2400, 0, "", 21378),
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO TZ VALUES({values_question_marks})", rows)
+def table_location(session: Session):
+    session.add_all([
+        LOC(
+            ID=1,
+            Loc=main_location_id,
+            LocGrp=location_group_id,
+            Name="MBD",
+            Status=True,
+            PlFlag=False,
+            FullDlFlag=False,
+            LoFlag=False,
+            DlFlag=0
+        ),
+    ])
 
 
-@pytest.fixture
-def table_devices(in_memory_sqlite: SqliteConnection, table_location_group):
-    in_memory_sqlite.execute("CREATE TABLE DEV(ID INTEGER PRIMARY KEY, Loc, Device, Name)")
-
-    rows = [
-        (0, main_location_id, 0, 'Main Door'),
-        (1, main_location_id, 1, 'Tenant 1 Door'),
-        (2, main_location_id, 2, 'Tenant 2 Door'),
-        (3, main_location_id, 3, 'Tenant 3 Door A'),
-        (4, main_location_id, 4, 'Tenant 3 Door B'),
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO DEV VALUES({values_question_marks})", rows)
-
-
-@pytest.fixture
-def table_acl_group_name(in_memory_sqlite: SqliteConnection, table_location_group):
-    in_memory_sqlite.execute("CREATE TABLE AclGrpName(ID INTEGER PRIMARY KEY, LocGrp, Name, Notes, Visitor, IsMaster)")
-
-    rows = [
-        (1, location_group_id, "Master Access Level", '', False, True),
-        (2, location_group_id, "Main Building Access", '', False, False),
-        (3, location_group_id, "Tenant 1", '', False, False),
-        (4, location_group_id, "Tenant 2", '', False, False),
-        (5, location_group_id, "Tenant 3", '', False, False),
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO AclGrpName VALUES({values_question_marks})", rows)
-
-
-@pytest.fixture
-def table_acl_group(in_memory_sqlite: SqliteConnection, table_acl_group_name, table_location, table_devices,
-                    table_timezone):
-    in_memory_sqlite.execute("CREATE TABLE AclGrp(ID INTEGER PRIMARY KEY, AclGrpNameID, Loc, Dev, Tz1, Tz2, Tz3, Tz4)")
-
-    rows = [
-        (1, 2, main_location_id, 0, 1, 0, 0, 0),  # Main Building Access to Main Door
-        (2, 3, main_location_id, 0, 1, 0, 0, 0),  # Tenant 1 Access to Main Door
-        (3, 4, main_location_id, 0, 1, 0, 0, 0),  # Tenant 2 Access to Main Door
-        (4, 5, main_location_id, 0, 1, 0, 0, 0),  # Tenant 3 Access to Main Door
-        (5, 3, main_location_id, 1, 1, 0, 0, 0),  # Tenant 1 Access to Tenant 1 Door
-        (6, 4, main_location_id, 2, 1, 0, 0, 0),  # Tenant 2 Access to Tenant 2 Door
-        (7, 5, main_location_id, 3, 1, 0, 0, 0),  # Tenant 3 Access to Tenant 3 Door A
-        (8, 5, main_location_id, 4, 1, 0, 0, 0),  # Tenant 3 Access to Tenant 3 Door B
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO AclGrp VALUES({values_question_marks})", rows)
-
-
-@pytest.fixture
-def table_acl_group_combo(in_memory_sqlite: SqliteConnection, table_location_group, table_acl_group_name):
-    in_memory_sqlite.execute("CREATE TABLE AclGrpCombo(ID INTEGER PRIMARY KEY, AclGrpNameID, ComboID, LocGrp)")
-
-    rows = [
-        (100, 1, 100, location_group_id),  # 100: Master Access Level
-        (101, 2, 101, location_group_id),  # 101: Main Building
-        (102, 2, 102, location_group_id),  # 102: Main Building
-        (103, 3, 102, location_group_id),  # 102: Tenant 1
-        (104, 2, 104, location_group_id),  # 104: Main Building
-        (105, 4, 104, location_group_id),  # 104: Tenant 2
-        (106, 2, 106, location_group_id),  # 106: Main Building
-        (107, 5, 106, location_group_id),  # 106: Tenant 3
-        (108, 3, 108, location_group_id),  # 102: Tenant 1 Only
-        (109, 4, 109, location_group_id),  # 104: Tenant 2 Only
-        (110, 5, 110, location_group_id),  # 106: Tenant 3 Only
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO AclGrpCombo VALUES({values_question_marks})", rows)
+def table_timezone(session: Session):
+    session.add_all([
+        TZ(ID=-659436830,
+           Loc=main_location_id,
+           TZ=1,
+           Name="Always(24x7)",
+           LinkStatus=0,
+           SunStart=0,
+           SunStop=2400,
+           MonStart=0,
+           MonStop=2400,
+           TueStart=0,
+           TueStop=2400,
+           WedStart=0,
+           WedStop=2400,
+           ThuStart=0,
+           ThuStop=2400,
+           FriStart=0,
+           FriStop=2400,
+           SatStart=0,
+           SatStop=2400,
+           Hol1Start=0,
+           Hol1Stop=2400,
+           Hol2Start=0,
+           Hol2Stop=2400,
+           Hol3Start=0,
+           Hol3Stop=2400,
+           DlFlag=0),
+        TZ(ID=-1576553029,
+           Loc=main_location_id,
+           TZ=2,
+           Name="Front Door Auto Unlock",
+           LinkStatus=1,
+           SunStart=1300,
+           SunStop=945,
+           MonStart=1400,
+           MonStop=1100,
+           TueStart=1400,
+           TueStop=1100,
+           WedStart=1400,
+           WedStop=1100,
+           ThuStart=1400,
+           ThuStop=1100,
+           FriStart=1400,
+           FriStop=1100,
+           SatStart=2300,
+           SatStop=1930,
+           Hol1Start=0,
+           Hol1Stop=2400,
+           Hol2Start=0,
+           Hol2Stop=2400,
+           Hol3Start=0,
+           Hol3Stop=2400,
+           DlFlag=0),
+    ])
 
 
-@pytest.fixture
-def table_company(in_memory_sqlite: SqliteConnection, table_location_group):
-    in_memory_sqlite.execute("CREATE TABLE COMPANY(ID INTEGER PRIMARY KEY, LocGrp, Company, Name)")
+def table_devices(session: Session):
+    session.add_all([
+        DEV(ID=0, Loc=main_location_id, Device=0, Name='Main Door'),
+        DEV(ID=1, Loc=main_location_id, Device=1, Name='Tenant 1 Door'),
+        DEV(ID=2, Loc=main_location_id, Device=2, Name='Tenant 2 Door'),
+        DEV(ID=3, Loc=main_location_id, Device=3, Name='Tenant 3 Door A'),
+        DEV(ID=4, Loc=main_location_id, Device=4, Name='Tenant 3 Door B'),
+    ])
 
+
+def table_acl_group_name(session: Session):
+    session.add_all([
+        AclGrpName(ID=1, LocGrp=location_group_id, Name="Master Access Level"),
+        AclGrpName(ID=2, LocGrp=location_group_id, Name="Main Building Access"),
+        AclGrpName(ID=3, LocGrp=location_group_id, Name="Tenant 1"),
+        AclGrpName(ID=4, LocGrp=location_group_id, Name="Tenant 2"),
+        AclGrpName(ID=5, LocGrp=location_group_id, Name="Tenant 3"),
+    ])
+
+
+def table_acl_group(session: Session):
+    session.add_all([
+        AclGrp(ID=1, AclGrpNameID=2, Loc=main_location_id, Dev=0, Tz1=1),  # Main Building Access to Main Door
+        AclGrp(ID=2, AclGrpNameID=3, Loc=main_location_id, Dev=0, Tz1=1),  # Tenant 1 Access to Main Door
+        AclGrp(ID=3, AclGrpNameID=4, Loc=main_location_id, Dev=0, Tz1=1),  # Tenant 2 Access to Main Door
+        AclGrp(ID=4, AclGrpNameID=5, Loc=main_location_id, Dev=0, Tz1=1),  # Tenant 3 Access to Main Door
+        AclGrp(ID=5, AclGrpNameID=3, Loc=main_location_id, Dev=1, Tz1=1),  # Tenant 1 Access to Tenant 1 Door
+        AclGrp(ID=6, AclGrpNameID=4, Loc=main_location_id, Dev=2, Tz1=1),  # Tenant 2 Access to Tenant 2 Door
+        AclGrp(ID=7, AclGrpNameID=5, Loc=main_location_id, Dev=3, Tz1=1),  # Tenant 3 Access to Tenant 3 Door A
+        AclGrp(ID=8, AclGrpNameID=5, Loc=main_location_id, Dev=4, Tz1=1),  # Tenant 3 Access to Tenant 3 Door B
+    ])
+
+
+def table_acl_group_combo(session: Session):
+    session.add_all([
+        AclGrpCombo(ID=100, AclGrpNameID=1, ComboID=100, LocGrp=location_group_id),  # 100: Master Access Level
+        AclGrpCombo(ID=101, AclGrpNameID=2, ComboID=101, LocGrp=location_group_id),  # 101: Main Building
+        AclGrpCombo(ID=102, AclGrpNameID=2, ComboID=102, LocGrp=location_group_id),  # 102: Main Building
+        AclGrpCombo(ID=103, AclGrpNameID=3, ComboID=102, LocGrp=location_group_id),  # 102: Tenant 1
+        AclGrpCombo(ID=104, AclGrpNameID=2, ComboID=104, LocGrp=location_group_id),  # 104: Main Building
+        AclGrpCombo(ID=105, AclGrpNameID=4, ComboID=104, LocGrp=location_group_id),  # 104: Tenant 2
+        AclGrpCombo(ID=106, AclGrpNameID=2, ComboID=106, LocGrp=location_group_id),  # 106: Main Building
+        AclGrpCombo(ID=107, AclGrpNameID=5, ComboID=106, LocGrp=location_group_id),  # 106: Tenant 3
+        AclGrpCombo(ID=108, AclGrpNameID=3, ComboID=108, LocGrp=location_group_id),  # 102: Tenant 1 Only
+        AclGrpCombo(ID=109, AclGrpNameID=4, ComboID=109, LocGrp=location_group_id),  # 104: Tenant 2 Only
+        AclGrpCombo(ID=110, AclGrpNameID=5, ComboID=110, LocGrp=location_group_id),  # 106: Tenant 3 Only
+    ])
+
+
+def table_company(session: Session):
     # In practice, the COMPANY.id field is not used. The COMPANY.Company field is used as the ID everywhere in the DB.
-    rows = [
-        (11, location_group_id, 1, "Building Management"),
-        (12, location_group_id, 2, "Security Company"),
-        (13, location_group_id, 3, "Tenant 1"),
-        (14, location_group_id, 4, "Tenant 2"),
-        (15, location_group_id, 5, "Tenant 3"),
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO COMPANY VALUES({values_question_marks})", rows)
+    session.add_all([
+        COMPANY(ID=11, LocGrp=location_group_id, Company=1, Name="Building Management"),
+        COMPANY(ID=12, LocGrp=location_group_id, Company=2, Name="Security Company"),
+        COMPANY(ID=13, LocGrp=location_group_id, Company=3, Name="Tenant 1"),
+        COMPANY(ID=14, LocGrp=location_group_id, Company=4, Name="Tenant 2"),
+        COMPANY(ID=15, LocGrp=location_group_id, Company=5, Name="Tenant 3"),
+    ])
 
 
-@pytest.fixture
-def table_names(in_memory_sqlite: SqliteConnection, table_location_group, table_company):
-    in_memory_sqlite.execute("CREATE TABLE NAMES(ID INTEGER PRIMARY KEY, LocGrp, FName, LName, Company)")
-
-    rows = [
-        (1, location_group_id, "BobThe", "BuildingManager", 1),
-        (2, location_group_id, "Fire", "Key", 1),
-        (3, location_group_id, "Ray", "Securitay", 2),
-        (4, location_group_id, "Best", "Employee", 3),
-        (5, location_group_id, "Worst", "Employee", 3),
-        (6, location_group_id, "Best", "Employee", 4),  # Same name, different company
-        (7, location_group_id, "ToBe", "Fired", 4),
+def table_names(session: Session):
+    session.add_all([
+        NAMES(ID=1, LocGrp=location_group_id, FName="BobThe", LName="BuildingManager", Company=1),
+        NAMES(ID=2, LocGrp=location_group_id, FName="Fire", LName="Key", Company=1),
+        NAMES(ID=3, LocGrp=location_group_id, FName="Ray", LName="Securitay", Company=2),
+        NAMES(ID=4, LocGrp=location_group_id, FName="Best", LName="Employee", Company=3),
+        NAMES(ID=5, LocGrp=location_group_id, FName="Worst", LName="Employee", Company=3),
+        NAMES(ID=6, LocGrp=location_group_id, FName="Best", LName="Employee", Company=4),  # Same name, different company
+        NAMES(ID=7, LocGrp=location_group_id, FName="ToBe", LName="Fired", Company=4),
         # Tenant 3 intentionally has no employees listed here so we can insert them in the unit test and just assert on
         # count by company
-    ]
-    values_question_marks = ', '.join('?' for _ in range(len(rows[0])))
-    in_memory_sqlite.executemany(f"INSERT INTO NAMES VALUES({values_question_marks})", rows)
+    ])
 
 
 # TODO Table CARDS
@@ -189,11 +193,19 @@ def table_names(in_memory_sqlite: SqliteConnection, table_location_group, table_
 
 
 @pytest.fixture
-def acs_data(
-        in_memory_sqlite: SqliteConnection,
-        table_acl_group_combo,
-        table_acl_group,
-        table_names
-):
-    # Tables that would be generated indirectly are not included, by convention
-    return AcsData(in_memory_sqlite, location_group_id)
+def acs_data_engine() -> Engine:
+    engine = EngineFactory.in_memory_sqlite()
+    AcsDataBase.metadata.create_all(engine)
+
+    session = Session(engine)
+    table_location_group(session)
+    table_location(session)
+    table_timezone(session)
+    table_devices(session)
+    table_acl_group_name(session)
+    table_acl_group_combo(session)
+    table_company(session)
+
+    session.commit()
+
+    return engine

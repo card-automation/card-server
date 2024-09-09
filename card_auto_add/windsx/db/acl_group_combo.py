@@ -1,7 +1,10 @@
 from itertools import groupby
-from typing import Optional, Union, Iterable, Dict, Collection
+from typing import Optional, Union, Iterable, Dict, Collection, List
 
-from card_auto_add.windsx.db.connection.connection import Connection
+from sqlalchemy import Engine, select, distinct
+from sqlalchemy.orm import Session
+
+from card_auto_add.windsx.db.models import AclGrpCombo, AclGrpName
 
 StringOrFrozenSet = Union[str, frozenset[str], Iterable[str]]
 
@@ -26,14 +29,36 @@ class AclGroupNameNotInDatabase(_AclGroupNameNotFound):
         super().__init__(f"\"{name}\" was not found in the database", name)
 
 
-class AclGroupCombo:
+class AclGroupComboHelper:
+    def __init__(self, engine: Engine, location_group_id: int):
+        self._location_group_id = location_group_id
+        self._engine = engine
+
+    def empty(self) -> 'AclGroupComboSet':
+        return AclGroupComboSet(self._engine, self._location_group_id, 0)
+
+    def by_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet':
+        return self.empty().with_names(*names)
+
+    def by_id(self, combo_id: int):
+        return AclGroupComboSet(self._engine, self._location_group_id, combo_id)
+
+    def all(self) -> List['AclGroupComboSet']:
+        session = Session(self._engine)
+        combo_id_rows = session.execute(select(distinct(AclGrpCombo.ComboID))).all()
+
+        return [self.by_id(row[0]) for row in combo_id_rows]
+
+
+class AclGroupComboSet:
     def __init__(self,
-                 connection: Connection,
+                 engine: Engine,
                  location_group_id: int,
                  combo_id: int
                  ):
         self._location_group_id = location_group_id
-        self._connection = connection
+        self._engine = engine
+        self._session = Session(engine)
         self._combo_id = combo_id
         self._names: Optional[frozenset[[str]]] = None
         self._in_db: Optional[bool] = None
@@ -61,10 +86,9 @@ class AclGroupCombo:
         return f"{self.id}: {names}"
 
     def _populate_from_db(self):
-        name_id_rows = self._connection.execute(
-            "SELECT AclGrpNameID FROM AclGrpCombo WHERE ComboID = ?",
-            self._combo_id
-        ).fetchall()
+        # noinspection PyTypeChecker
+        query = select(AclGrpCombo.AclGrpNameID).where(AclGrpCombo.ComboID == self._combo_id)
+        name_id_rows = self._session.execute(query).all()
 
         if len(name_id_rows) == 0:
             self._names = frozenset()
@@ -95,11 +119,8 @@ class AclGroupCombo:
         return result
 
     def _names_by_id(self, name_ids: Collection[int]) -> Dict[int, str]:
-        values_question_marks = ', '.join('?' for _ in range(len(name_ids)))
-        acl_group_name_rows = self._connection.execute(
-            f"SELECT ID, NAME FROM AclGrpName WHERE ID IN ({values_question_marks})",
-            *name_ids
-        ).fetchall()
+        query = select(AclGrpName.ID, AclGrpName.Name).where(AclGrpName.ID.in_(name_ids))
+        acl_group_name_rows = self._session.execute(query).all()
 
         id_to_names = {}
 
@@ -112,11 +133,8 @@ class AclGroupCombo:
         return id_to_names
 
     def _name_ids_by_name(self, names: Collection[str]) -> Dict[str, int]:
-        values_question_marks = ', '.join('?' for _ in range(len(names)))
-        acl_group_name_rows = self._connection.execute(
-            f"SELECT ID, NAME FROM AclGrpName WHERE NAME IN ({values_question_marks})",
-            *names
-        ).fetchall()
+        query = select(AclGrpName.ID, AclGrpName.Name).where(AclGrpName.Name.in_(names))
+        acl_group_name_rows = self._session.execute(query).all()
 
         names_to_ids = {}
 
@@ -130,13 +148,13 @@ class AclGroupCombo:
 
         return names_to_ids
 
-    def with_names(self, *names: StringOrFrozenSet) -> 'AclGroupCombo':
+    def with_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet':
         names = self._to_set(*names)
         all_names = self.names.union(names)
 
         return self._get_acl_by_names(all_names)
 
-    def without_names(self, *names: StringOrFrozenSet) -> 'AclGroupCombo':
+    def without_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet':
         names = self._to_set(names)
 
         for name in names:
@@ -150,20 +168,21 @@ class AclGroupCombo:
     def _get_acl_by_names(self, all_names):
         wanted_name_ids = set(self._name_ids_by_name(all_names).values())
 
-        acl_combos = list(self._connection.execute("SELECT AclGrpNameID, ComboID FROM AclGrpCombo"))
+        query = select(AclGrpCombo.AclGrpNameID, AclGrpCombo.ComboID)
+        acl_combos = self._session.execute(query).all()
         grouped_by_combo_id = groupby(acl_combos, lambda x: x[1])  # Group by the Combo ID
 
         for new_combo_id, value in grouped_by_combo_id:
             acl_name_ids = set([x[0] for x in value])
             if acl_name_ids == wanted_name_ids:  # Oh good, we found an exact match
-                return AclGroupCombo(
-                    self._connection,
+                return AclGroupComboSet(
+                    self._engine,
                     self._location_group_id,
                     new_combo_id
                 )
 
         # This doesn't exist, so we create one, update the names manually, and mark it as not in the database
-        result = AclGroupCombo(self._connection, self._location_group_id, 0)
+        result = AclGroupComboSet(self._engine, self._location_group_id, 0)
         result._names = all_names
         result._in_db = False
 
@@ -181,24 +200,27 @@ class AclGroupCombo:
 
         # We need to insert one of them to get a new combo id. The ID field gets a generated ID, which we treat as the
         # combo id for this AclGrpComboId
-        with self._connection as conn:  # Scope a new cursor to avoid other cursors messing up our last row id
-            conn.execute(
-                "INSERT INTO AclGrpCombo(AclGrpNameID, ComboID, LocGrp) VALUES (?, ?, ?)",
-                next(name_id_iterator), 0, self._location_group_id
-            )
-            self._combo_id = conn.last_row_id
+        starting_combo = AclGrpCombo(
+            AclGrpNameID=next(name_id_iterator),  # next meaning "just grab the first one". We handle any others below
+            ComboID=0,  # Explicitly setting this to 0, will update it after this record is inserted
+            LocGrp=self._location_group_id
+        )
+        self._session.add(starting_combo)
+        self._session.commit()
 
-        # That insert did not populate ComboID, which means it's currently 0. We update that row to have the same
-        # combo_id as its ID
-        self._connection.execute(
-            "UPDATE AclGrpCombo SET ComboID = ? WHERE ID = ?",
-            self._combo_id, self._combo_id
+        # Now we should have an ID we can assign to this set and to the starting object, which will get updated next commit
+        self._combo_id = starting_combo.ComboID = starting_combo.ID
+
+        self._session.add_all(
+            [
+                AclGrpCombo(
+                    AclGrpNameID=name_id,
+                    ComboID=self._combo_id,
+                    LocGrp=self._location_group_id
+                ) for name_id in name_id_iterator
+            ]
         )
 
-        # Now we just have to insert the rest of our rows
-        self._connection.executemany(
-            "INSERT INTO AclGrpCombo(AclGrpNameID, ComboID, LocGrp) VALUES (?, ?, ?)",
-            [(name_id, self._combo_id, self._location_group_id) for name_id in name_id_iterator]
-        )
+        self._session.commit()
 
         self._in_db = True  # Now we're in the database :)
