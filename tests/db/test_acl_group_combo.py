@@ -38,6 +38,12 @@ class TestAclGroupCombo:
         assert acl_group_combo.names == frozenset({self._tenant_3, self._main_building_access})
         assert acl_group_combo.in_db
 
+    def test_lookup_by_id_that_does_not_exist(self, acl_group_combo_helper: AclGroupComboHelper):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_id(99)
+        assert acl_group_combo.id == 99
+        assert len(acl_group_combo.names) == 0
+        assert not acl_group_combo.in_db
+
     def test_lookup_by_name(self, acl_group_combo_helper: AclGroupComboHelper):
         acl_group_combo: AclGroupComboSet = acl_group_combo_helper.by_names(self._tenant_1)
         assert acl_group_combo.id == 108
@@ -80,7 +86,8 @@ class TestAclGroupCombo:
         assert new_acl_group_combo.names == acl_group_combo.names
         assert new_acl_group_combo.in_db == acl_group_combo.in_db
 
-    def test_nothing_writes_if_in_db_already(self, acs_data_engine: Engine, acl_group_combo_helper: AclGroupComboHelper):
+    def test_nothing_writes_if_in_db_already(self, acs_data_engine: Engine,
+                                             acl_group_combo_helper: AclGroupComboHelper):
         session = Session(acs_data_engine)
         starting_rows = session.execute(select(AclGrpCombo)).all()
 
@@ -169,5 +176,3 @@ class TestAclGroupCombo:
         assertions(108, frozenset({self._tenant_1}))
         assertions(109, frozenset({self._tenant_2}))
         assertions(110, frozenset({self._tenant_3}))
-
-    # TODO test lookup by id not found
