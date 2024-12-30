@@ -2,17 +2,18 @@ import time
 import uuid
 from collections import defaultdict
 from datetime import datetime
-from itertools import groupby
-from typing import Union, Optional
+from typing import Union, Sequence, Optional, Iterable
 
 import requests
+from sqlalchemy import select, Engine, func
+from sqlalchemy.orm import Session
 
 from card_auto_add.config import Config
 from card_auto_add.data_signing import DataSigning
 from card_auto_add.loops.comm_server_watcher import CommServerWatcher
-from card_auto_add.windsx.database import Database
-from card_auto_add.windsx.db.acl_group_combo import AclGroupComboSet
-from card_auto_add.windsx.db.acs_data import AcsData
+from card_auto_add.windsx.db.acl_group_combo import AclGroupComboSet, AclGroupComboHelper
+from card_auto_add.windsx.db.models import COMPANY, UdfName, UDF, NAMES, CARDS, LocCards, AclGrpCombo, AclGrp, LOC, \
+    DGRP, ACL
 
 
 class CardInfo(object):
@@ -34,13 +35,14 @@ class WinDSXCardActivations(object):
 
     def __init__(self,
                  config: Config,
-                 acs_db: Database,
-                 acs_data: AcsData,
+                 acs_engine: Engine,
                  comm_server_watcher: CommServerWatcher,
                  ):
-        self._acs_db: Database = acs_db
-        self._acs_data = acs_data
         self._config: Config = config
+        self._acs_engine: Engine = acs_engine
+        self._session: Session = Session(acs_engine)
+        self._acl_group_combo_helper: AclGroupComboHelper = AclGroupComboHelper(acs_engine,
+                                                                                3)  # TODO Don't hardcode location id
         self._default_acl = config.windsx_acl
         self._log = config.logger
         self._slack_log = config.slack_logger
@@ -54,7 +56,8 @@ class WinDSXCardActivations(object):
         self._log.info(f"Activating card {card_info.card}")
         self._slack_log.info(f"Activating card {card_info.card} for {card_info.first_name} {card_info.last_name}")
 
-        to_add_group_combo: AclGroupComboSet = self._acs_data.acl_group_combo.by_names(self._default_acl)
+        to_add_group_combo: AclGroupComboSet = self._acl_group_combo_helper.by_names(
+            self._default_acl)  # TODO This shouldn't be hardcoded
 
         name_id = self._find_or_create_name(card_info)
 
@@ -65,7 +68,7 @@ class WinDSXCardActivations(object):
             card_combo_id = to_add_group_combo.id
             card_id = self._create_card(name_id, card_info.card, card_combo_id)
         else:
-            existing_group_combo: AclGroupComboSet = self._acs_data.acl_group_combo.by_id(card_combo_id)
+            existing_group_combo: AclGroupComboSet = self._acl_group_combo_helper.by_id(card_combo_id)
             new_group_combo: AclGroupComboSet = existing_group_combo.with_names(to_add_group_combo.names)
 
             # We check the DB just in case the existing card combo id is 0 but the new group is different
@@ -106,30 +109,30 @@ class WinDSXCardActivations(object):
         # First, let's try to find it via uuid5
         customer_uuid = str(uuid.uuid5(uuid.NAMESPACE_OID, str(card_info.user_id)))
 
-        udf_num = self._acs_db.cursor.execute("SELECT UdfNum FROM UdfName WHERE Name = ?", self._udf_name).fetchval()
+        udf_num = self._session.execute(select(UdfName.UdfNum).where(UdfName.Name == self._udf_name)).scalar()
 
         if udf_num is None:
             raise ValueError(f"Failed to find UDF Name ID {self._udf_name}")
 
-        name_id = self._acs_db.cursor.execute(
-            "SELECT NameId FROM UDF WHERE UdfNum = ? AND UdfText = ?",
-            (udf_num, customer_uuid)
-        ).fetchval()
+        name_id = self._session.execute(
+            select(UDF.NameID).where(UDF.UdfNum == udf_num).where(UDF.UdfText == customer_uuid)
+        ).scalar()
 
         if name_id is not None:
             self._log.info(f"Found name id {name_id} based on customer id {card_info.user_id}")
             return name_id
 
-        company_id = self._acs_db.cursor.execute("SELECT Company from COMPANY WHERE Name = ?",
-                                                 card_info.company).fetchval()
+        company_id = self._session.execute(select(COMPANY.Company).where(COMPANY.Name == card_info.company)).scalar()
 
         if company_id is None:
             raise ValueError(f"No company found for company name '{card_info.company}'")
 
-        name_id = self._acs_db.cursor.execute(
-            "SELECT ID FROM NAMES WHERE FName = ? AND LName = ? AND Company = ?",
-            (card_info.first_name, card_info.last_name, company_id)
-        ).fetchval()
+        name_id = self._session.execute(
+            select(NAMES.ID) \
+                .where(NAMES.FName == card_info.first_name)
+                .where(NAMES.LName == card_info.last_name)
+                .where(NAMES.Company == company_id)
+        ).scalar()
 
         if name_id is not None:
             self._log.info(f"Found name id {name_id} based on customer's first/last name and company")
@@ -139,11 +142,15 @@ class WinDSXCardActivations(object):
 
         self._log.info(f"No name ID found for customer {card_info.user_id}, will make one")
 
-        self._acs_db.cursor.execute(
-            "INSERT INTO NAMES(LocGrp, FName, LName, Company) VALUES (?, ?, ?, ?)",
-            (self._loc_grp, card_info.first_name, card_info.last_name, company_id)
+        new_name = NAMES(
+            LocGrp=self._loc_grp,
+            FName=card_info.first_name,
+            LName=card_info.last_name,
+            Company=company_id
         )
-        name_id = self._acs_db.cursor.execute("SELECT @@IDENTITY").fetchval()
+        self._session.add(new_name)
+        self._session.commit()
+        name_id = new_name.ID
 
         if name_id is None:
             raise ValueError("Didn't get name ID on insert")
@@ -152,41 +159,36 @@ class WinDSXCardActivations(object):
 
         return name_id
 
-    def _create_or_update_udf_text(self, udf_num, name_id, customer_uuid):
-        existing_value = self._acs_db.cursor.execute(
-            "SELECT UdfText FROM UDF WHERE NameID = ? AND UdfNum = ?",
-            (name_id, udf_num)
-        ).fetchval()
+    def _create_or_update_udf_text(self, udf_num, name_id: int, customer_uuid):
+        udf: UDF = self._session.execute(
+            select(UDF).where(UDF.NameID == name_id).where(UDF.UdfNum == udf_num)
+        ).scalar()
 
-        if existing_value is not None:
-            if existing_value != customer_uuid:
-                self._acs_db.cursor.execute(
-                    "UPDATE UDF SET UdfText = ? WHERE NameId = ? AND UdfNum = ?",
-                    (customer_uuid, name_id, udf_num)
-                )
+        if udf is not None:
+            udf.UdfText = customer_uuid
         else:
-            self._acs_db.cursor.execute(
-                "INSERT INTO UDF(LocGrp, NameID, UdfNum, UdfText) VALUES (?, ?, ?, ?)",
-                (self._loc_grp, name_id, udf_num, customer_uuid)
+            udf = UDF(
+                LocGrp=self._loc_grp,
+                NameID=name_id,
+                UdfNum=udf_num,
+                UdfText=customer_uuid
             )
+            self._session.add(udf)
 
-        self._acs_db.connection.commit()
+        self._session.commit()
 
     def _get_card_combo_id(self, card_num: Union[str, int]):
         if not isinstance(card_num, str):
             card_num = str(card_num)
 
-        sql = "SELECT ID, AclGrpComboId FROM CARDS WHERE Code = ?"
+        card = self._session.execute(select(CARDS).where(CARDS.Code == card_num.lstrip('0'))).scalar()
 
-        self._acs_db.cursor.execute(sql, card_num.lstrip('0'))
-        row = self._acs_db.cursor.fetchone()
-
-        if row is None:
+        if card is None:
             self._log.info(f"No existing card was found for card {card_num}")
             return None, None
         else:
-            card_id = row.ID
-            card_combo_id = row.AclGrpComboId
+            card_id = card.ID
+            card_combo_id = card.AclGrpComboID
             self._log.info(f"Found card id {card_id} and combo id {card_combo_id} for card {card_num}")
 
             return card_id, card_combo_id
@@ -196,58 +198,64 @@ class WinDSXCardActivations(object):
         # accordingly.
 
         now = datetime.now()
-
-        self._acs_db.cursor.execute(
-            """
-                INSERT INTO CARDS(NameID, LocGrp, Code, StartDate, StopDate, Status, CardNum, DlFlag, AclGrpComboId)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (name_id, self._loc_grp, card_num.lstrip('0'), now, self._date_never, True, card_num, 0, card_combo_id)
+        card = CARDS(
+            NameID=name_id,
+            LocGrp=self._loc_grp,
+            Code=card_num.lstrip('0'),
+            StartDate=now,
+            StopDate=self._date_never,
+            Status=True,
+            CardNum=card_num,
+            DlFlag=0,
+            AclGrpComboID=card_combo_id
         )
+        self._session.add(card)
 
-        card_id = self._acs_db.cursor.execute("SELECT @@IDENTITY").fetchval()
+        card_id = card.ID
         if card_id is None:
             raise ValueError(f"Card ID could not be retrieved on created card for card {card_num}")
-
-        self._acs_db.connection.commit()
 
         self._log.info(f"Created card with card id {card_id}")
 
         return card_id
 
     def _update_card_combo_id(self, card_id, new_card_combo_id):
-        self._acs_db.cursor.execute(
-            "UPDATE CARDS SET AclGrpComboID = ?, DlFlag = 1 WHERE ID = ?",
-            (new_card_combo_id, card_id)
-        )
-        self._acs_db.connection.commit()
+        card = self._session.execute(select(CARDS).where(CARDS.ID == card_id)).scalar()
+        card.AclGrpComboID = new_card_combo_id
+        card.DlFlag = 1
+        self._session.add(card)
+        self._session.commit()
 
     def _set_card_active(self, card_id, name_id):
-        self._acs_db.cursor.execute(
-            "UPDATE CARDS SET NameID = ?, StartDate = ?, StopDate = ?, DlFlag = 1, Status = True WHERE ID = ?",
-            (name_id, datetime.now(), self._date_never, card_id)
-        )
-        self._acs_db.connection.commit()
+        card = self._session.execute(select(CARDS).where(CARDS.ID == card_id)).scalar()
+        card.NameID = name_id
+        card.StartDate = datetime.now()
+        card.StopDate = self._date_never
+        card.DlFlag = 1
+        card.Status = True
+        self._session.add(card)
+        self._session.commit()
 
     def _set_card_inactive(self, card_id):
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        self._acs_db.cursor.execute(
-            "UPDATE CARDS SET StopDate = ?, DlFlag = 1, Status = False WHERE ID = ?",
-            (today, card_id)
-        )
+        card = self._session.execute(select(CARDS).where(CARDS.ID == card_id)).scalar()
+        card.StopDate = today
+        card.DlFlag = 1
+        card.Status = False
+        self._session.add(card)
 
-        self._acs_db.cursor.execute("UPDATE LocCards SET DlFlag = 1, CkSum = 0 WHERE CardID = ?", card_id)
-        self._acs_db.connection.commit()
+        loc_card = self._session.execute(select(LocCards).where(LocCards.CardID == card_id)).scalar()
+        loc_card.DlFlag = 1
+        loc_card.CkSum = 0
+        self._session.add(loc_card)
+
+        self._session.commit()
 
     def _find_or_create_acl_id(self, card_combo_id):
-        device_access = self._acs_db.cursor.execute(
-            """
-                SELECT Dev, Tz1, Tz2, Tz3, Tz4 FROM ACLGrp WHERE AclGrpNameID IN (
-                    SELECT AclGrpNameID From AclGrpCombo WHERE ComboId = ?
-                )
-            """,
-            card_combo_id
-        ).fetchall()
+        query = select(AclGrp) \
+            .join(AclGrpCombo, AclGrp.AclGrpNameID == AclGrpCombo.AclGrpNameID) \
+            .where(AclGrpCombo.ComboID == card_combo_id)
+        device_access: list[AclGrp] = [row[0] for row in self._session.execute(query).fetchall()]
 
         tz_to_dev_list = defaultdict(lambda: set())
         for access in device_access:
@@ -259,18 +267,19 @@ class WinDSXCardActivations(object):
                 tz_to_dev_list[access.Tz3].add(access.Dev)
             if access.Tz4 != 0:
                 tz_to_dev_list[access.Tz4].add(access.Dev)
-        tz_to_device_group = {}
+        tz_to_device_group: dict[int, int] = {}
         for tz, dev_list in tz_to_dev_list.items():
             tz_to_device_group[tz] = self._find_or_create_matching_device_group(dev_list)
 
         acls = set()
         for tz, device_group in tz_to_device_group.items():
-            acls.add(self._find_or_create_matching_acl(tz, device_group))
+            acl: ACL = self._find_or_create_matching_acl(tz, device_group)
+            acls.add(acl.Acl)
 
         return acls
 
     def _find_or_create_matching_device_group(self, dev_list):
-        device_groups = list(self._acs_db.cursor.execute("SELECT * FROM DGRP").fetchall())
+        device_groups: Sequence[DGRP] = self._session.scalars(select(DGRP)).all()
 
         for group in device_groups:
             valid_group = True
@@ -291,46 +300,51 @@ class WinDSXCardActivations(object):
         # Grab the next one by whatever the highest one is plus one.
         new_device_group_num = max([int(x.DGrp) for x in device_groups if float.is_integer(x.DGrp)]) + 1
 
-        sql = "INSERT INTO DGRP(DGrp, DlFlag, CkSum"
-        for i in range(128):
-            sql += f", D{i}"
+        new_device_group = DGRP(
+            DGrp=new_device_group_num,
+            DlFlag=1,
+            CkSum=0,
+        )
 
-        sql += ") VALUES ("
-        for i in range(128 + 3):  # 128 devices + 3 fields above
-            sql += f", ?"
-        sql += ")"
+        for dev in range(128):
+            setattr(new_device_group, f"D{dev}", dev in dev_list)
 
-        values = [new_device_group_num, 1, 0]
-        for i in range(128):
-            values.append(i in dev_list)
-
-        self._acs_db.cursor.execute(sql, values)
-        self._acs_db.connection.commit()
+        self._session.add(new_device_group)
+        self._session.commit()
 
         return new_device_group_num
 
-    def _find_or_create_matching_acl(self, tz, device_group):
-        acl = self._acs_db.cursor.execute("SELECT Acl FROM ACL WHERE Tz = ? AND DGrp = ?",
-                                          (tz, device_group)).fetchval()
+    def _find_or_create_matching_acl(self, tz: int, device_group: int) -> ACL:
+        acl: Optional[ACL] = self._session.scalar(select(ACL).where(ACL.Tz == tz).where(ACL.DGrp == device_group))
 
         if acl is not None:
             return acl
 
         self._log.info(f"Acl not found for Tz {tz} and device group {device_group}, creating one")
 
-        acl_names = self._acs_db.cursor.execute("SELECT Acl FROM ACL").fetchall()
-        acl = max([int(x.DGrp) for x in acl_names if float.is_integer(x.DGrp)]) + 1  # Grab the next one
+        new_acl_id = self._session.scalar(select(func.max(ACL.Acl))) + 1  # Grab the next one
 
-        self._acs_db.cursor.execute(
-            "INSERT INTO ACL(Loc, Acl, Tz, DGrp, DlFlag, CkSum) VALUES (?, ?, ?, ?, ?, ?)",
-            (self._loc_grp, acl, tz, device_group, 1, 0)
+        acl = ACL(
+            Loc=self._loc_grp,  # TODO Technically the group isn't the location. They're the same for my system.
+            Acl=new_acl_id,
+            Tz=tz,
+            DGrp=device_group,
+            DlFlag=1,
+            CkSum=0,
         )
-        self._acs_db.connection.commit()
+        self._session.add(acl)
+        self._session.commit()
 
         return acl
 
-    def _create_or_update_loc_cards(self, card_id, acl_ids):
-        loc_card_id = self._acs_db.cursor.execute("SELECT ID FROM LocCards WHERE CardID = ?", card_id).fetchval()
+    def _create_or_update_loc_cards(self, card_id: int, acl_ids: Iterable[int]):
+        loc_card: Optional[LocCards] = self._session.scalar(
+            select(LocCards)
+            .where(LocCards.CardID == card_id)
+            .where(LocCards.Loc == self._loc_grp)  # TODO loc_grp vs loc
+        )
+
+        acl_ids: list = list(acl_ids)
 
         acl = acl1 = acl2 = acl3 = acl4 = -1
         if acl_ids:
@@ -344,33 +358,44 @@ class WinDSXCardActivations(object):
         if acl_ids:
             acl4 = acl_ids.pop()
 
-        if loc_card_id is not None:
-            self._log.info(f"Found LocCard id {loc_card_id}, updating ACLs")
-            self._acs_db.cursor.execute(
-                "UPDATE LocCards SET DlFlag = 1, CkSum = 0, Acl = ?, Acl1 = ?, Acl2 = ?, Acl3 = ?, Acl4 = ? WHERE ID = ?",
-                (acl, acl1, acl2, acl3, acl4, loc_card_id)
+        if loc_card is None:
+            self._log.info("LocCard not found, creating one")
+            loc_card = LocCards(
+                Loc=self._loc_grp,  # TODO loc_grp vs loc
+                CardID=card_id,
             )
         else:
-            self._log.info("LocCard not found, creating one")
-            self._acs_db.cursor.execute(
-                "INSERT INTO LocCards(Loc, CardId, DlFlag, CkSum, Acl, Acl1, Acl2, Acl3, Acl4) "
-                "VAlUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (self._loc_grp, card_id, 1, 0, acl, acl1, acl2, acl3, acl4)
-            )
+            self._log.info(f"Found LocCard id {loc_card.ID}, updating ACLs")
 
-        self._acs_db.connection.commit()
+        loc_card.Acl = acl
+        loc_card.Acl1 = acl1
+        loc_card.Acl2 = acl2
+        loc_card.Acl3 = acl3
+        loc_card.Acl4 = acl4
+        loc_card.DlFlag = 1
+        loc_card.CkSum = 0
+
+        self._session.add(loc_card)
+        self._session.commit()
 
     def _encourage_system_update(self):
-        self._acs_db.cursor.execute(
-            "UPDATE LOC SET PlFlag=True, DlFlag=1, FullDlFlag=True, NodeCs=0, CodeCs=0, AclCs=0, DGrpCs=0"
-        )
+        locations = self._session.scalars(select(LOC).where(LOC.LocGrp == self._loc_grp)).all()
+        for location in locations:
+            location.PlFlag = True
+            location.DlFlag = 1
+            location.FullDlFlag = True
+            location.NodeCs = 0
+            location.CodeCs = 0
+            location.AclCs = 0
+            location.DGrpCs = 0
+            self._session.add(location)
 
-        self._acs_db.connection.commit()
+        self._session.commit()
 
         self._log.info("Comm Server update requested")
         for j in range(5):  # We'll endure up to 5 attempts
             for i in range(18):  # We'll endure 18 * 10 == 180 seconds to wait for the update before resetting
-                downloading = self._acs_db.cursor.execute("SELECT FullDlFlag FROM LOC").fetchval()
+                downloading = self._session.scalar(select(LOC.FullDlFlag))
 
                 if not downloading:
                     self._log.info("Looks like everything updated!")

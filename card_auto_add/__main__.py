@@ -5,6 +5,7 @@ import time
 from logging.handlers import RotatingFileHandler
 
 import sentry_sdk
+from sqlalchemy import Engine
 
 from card_auto_add.api import WebhookServerApi
 from card_auto_add.config import Config
@@ -17,8 +18,8 @@ from card_auto_add.windsx.activations import WinDSXCardActivations
 from card_auto_add.windsx.card_holders import WinDSXActiveCardHolders
 from card_auto_add.windsx.card_scan import WinDSXCardScan
 from card_auto_add.windsx.database import Database
-from card_auto_add.windsx.db.acs_data import AcsData
-from card_auto_add.windsx.db.connection.microsoft_access import MicrosoftAccessDatabaseConnection
+from card_auto_add.windsx.db.acl_group_combo import AclGroupComboHelper
+from card_auto_add.windsx.db.engine_factory import EngineFactory
 
 logger = logging.getLogger("card_access")
 logger.setLevel(logging.INFO)
@@ -46,11 +47,11 @@ server_api = WebhookServerApi(config)
 comm_server_watcher = CommServerWatcher(config)
 comm_server_watcher.start()
 
+acs_engine: Engine = EngineFactory.microsoft_access(config.acs_data_db_path)
 acs_db = Database(config.acs_data_db_path)
 log_db = Database(config.log_db_path)
-acs_data = AcsData(MicrosoftAccessDatabaseConnection(config.acs_data_db_path), 3)  # TODO don't hardcode this
 
-card_activations = WinDSXCardActivations(config, acs_db, acs_data, comm_server_watcher)
+card_activations = WinDSXCardActivations(config, acs_engine, comm_server_watcher)
 ingester = Ingester(config, card_activations, server_api)
 ingester.start()
 
