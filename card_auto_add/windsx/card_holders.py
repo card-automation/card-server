@@ -1,6 +1,9 @@
 from typing import List
 
-from card_auto_add.windsx.database import Database
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
+
+from card_auto_add.windsx.db.models import NAMES, COMPANY, UDF, CARDS
 
 
 class CardHolder(object):
@@ -22,48 +25,38 @@ class CardHolder(object):
 
 
 class WinDSXActiveCardHolders(object):
-    def __init__(self, acs_db: Database):
-        self._acs_db: Database = acs_db
+    def __init__(self, acs_engine: Engine):
+        self._acs_engine = acs_engine
+        self._session: Session = Session(acs_engine)
 
     def get_active_card_holders(self, company_name) -> List[CardHolder]:
-        sql = \
-            """
-                SELECT
-                    N.ID AS NameId,
-                    N.FName AS FirstName,
-                    N.LName AS LastName,
-                    CO.Name AS CompanyName,
-                    U.UdfText AS UdfId,
-                    CA.Code AS CardCode,
-                    CA.Status as CardStatus
-                FROM (
-                         (
-                             `NAMES` N
-                                 INNER JOIN COMPANY CO
-                                 ON CO.Company = N.Company
-                             )
-                            INNER JOIN CARDS CA
-                            ON CA.NameID = N.ID
-                         )
-                    LEFT JOIN UDF U
-                    ON U.NameID = N.ID
-                    WHERE CO.Name = ?
-                    AND CA.Status = true
-            """
+        rows = self._session.execute(
+            select(
+                NAMES.ID.label('name_id'),
+                NAMES.FName.label('first_name'),
+                NAMES.LName.label('last_name'),
+                COMPANY.Name.label('company_name'),
+                UDF.UdfText.label('udf_id'),
+                CARDS.Code.label('card_code'),
+                CARDS.Status.label('card_status'),
+            )
+            .join(COMPANY, NAMES.Company == COMPANY.Company)
+            .join(CARDS, CARDS.NameID == NAMES.ID)
+            .outerjoin(UDF, UDF.NameID == NAMES.ID)  # Left join
+            .where(COMPANY.Name == company_name)
+            .where(CARDS.Status)
+        ).all()
 
-        with self._acs_db.lock:
-            rows = list(self._acs_db.cursor.execute(sql, company_name))
+        card_holders = []
+        for row in rows:
+            card_holders.append(CardHolder(
+                name_id=row.name_id,
+                udf_id=row.udf_id,
+                first_name=row.first_name,
+                last_name=row.last_name,
+                company=row.company_name,
+                card=str(row.card_code).strip('0').rstrip('.'),
+                card_active=row.card_status
+            ))
 
-            card_holders = []
-            for row in rows:
-                card_holders.append(CardHolder(
-                    name_id=row.NameId,
-                    udf_id=row.UdfId,
-                    first_name=row.FirstName,
-                    last_name=row.LastName,
-                    company=row.CompanyName,
-                    card=str(row.CardCode).strip('0').rstrip('.'),
-                    card_active=row.CardStatus
-                ))
-
-            return card_holders
+        return card_holders

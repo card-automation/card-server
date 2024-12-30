@@ -55,7 +55,7 @@ card_activations = WinDSXCardActivations(config, acs_engine, comm_server_watcher
 ingester = Ingester(config, card_activations, server_api)
 ingester.start()
 
-card_holders = WinDSXActiveCardHolders(acs_db)
+card_holders = WinDSXActiveCardHolders(acs_engine)
 active_cards_watcher = ActiveCardsWatcher(config, server_api, card_holders)
 active_cards_watcher.start()
 
