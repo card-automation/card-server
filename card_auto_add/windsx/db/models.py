@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, DateTime
+from sqlalchemy import ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -1030,3 +1030,29 @@ class WorkStations(AcsDataBase):
     WorkSta: Mapped[int] = mapped_column('WorkSta', nullable=True, default=0)
     Name: Mapped[str] = mapped_column('Name', nullable=True)
     LastUsed: Mapped[datetime] = mapped_column('LastUsed', nullable=True)
+
+
+class LogDataBase(DeclarativeBase):
+    pass
+
+
+class EvnLog(LogDataBase):
+    __tablename__ = 'EvnLog'
+
+    """
+    If the columns designated as primary keys seems weird, that's because it definitely is super weird. There is not a
+    specified primary key on the table and no set of columns that uniquely identifies a row. We had duplicates across
+    the entire table. The columns with primary key set were the ones that didn't increase the number of duplicates we
+    had. e.g. the number of rows grouped on those columns should equal the number of distinct rows across all columns.
+    """
+    TimeDate: Mapped[datetime] = mapped_column('TimeDate', primary_key=True)
+    Loc: Mapped[int] = mapped_column('Loc', default=0)
+    Event: Mapped[int] = mapped_column('Event', default=0, primary_key=True)
+    Dev: Mapped[int] = mapped_column('Dev', default=-1)
+    IO: Mapped[int] = mapped_column('IO', default=0)
+    IOName: Mapped[str] = mapped_column('IOName', default='', primary_key=True)
+    Code: Mapped[float] = mapped_column('Code', default=0.0, primary_key=True)
+    LName: Mapped[str] = mapped_column('LName', default='')
+    FName: Mapped[str] = mapped_column('FName', default='')
+    Opr: Mapped[str] = mapped_column('Opr', default='')
+    Ws: Mapped[str] = mapped_column('Ws', default='')

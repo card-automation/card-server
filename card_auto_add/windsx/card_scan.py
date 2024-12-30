@@ -1,4 +1,7 @@
-from card_auto_add.windsx.database import Database
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
+
+from card_auto_add.windsx.db.models import COMPANY, EvnLog, NAMES, DEV
 
 
 class CardScan(object):
@@ -23,65 +26,56 @@ class CardScan(object):
 
 class WinDSXCardScan(object):
     def __init__(self,
-                 acs_db: Database,
-                 log_db: Database
+                 acs_engine: Engine,
+                 log_engine: Engine,
                  ):
-        self._acs_db: Database = acs_db
-        self._log_db: Database = log_db
-        self._company = self._get_company_from_name("denhac")
+        self._acs_engine: Engine = acs_engine
+        self._acs_session: Session = Session(acs_engine)
+        self._log_engine: Engine = log_engine
+        self._log_session: Session = Session(log_engine)
+        self._company: COMPANY = self._get_company_from_name("denhac")  # TODO Don't hardcode
 
     def get_scan_events_since(self, timestamp):
         access_allowed_code = 8
         access_denied_unknown_code = 174
-        sql = \
-            f"""
-            SELECT
-                TimeDate,
-                Event,
-                Code AS CardCode,
-                Opr AS NameId,
-                Dev AS Device
-            FROM EvnLog
-            WHERE Event IN ({access_allowed_code}, {access_denied_unknown_code})
-            AND IO = ?
-            AND TimeDate > ?
-        """
-
-        with self._log_db.lock:
-            rows = list(self._log_db.cursor.execute(sql, (self._company, timestamp)))
+        # TODO Do we need to support other access denied codes like wrong timezone?
+        rows = self._log_session.execute(
+            select(
+                EvnLog.TimeDate.label('timestamp'),
+                EvnLog.Event.label('event'),
+                EvnLog.Code.label('card_code'),
+                EvnLog.Opr.label('name_id'),
+                EvnLog.Dev.label('device')
+            )
+            .where(EvnLog.Event.in_([access_allowed_code, access_denied_unknown_code]))
+            .where(EvnLog.IO == self._company.Company)
+            .where(EvnLog.TimeDate > timestamp)
+        ).all()
 
         card_scans = []
 
         for row in rows:
-            name_info = self._get_name_info_from_id(row.NameId)
+            name_info = self._get_name_info_from_id(row.name_id)
             if name_info is None:
+                # TODO Does this happen? Should we report on it?
                 continue  # We couldn't find the name for this event
 
-            access_allowed = row.Event == access_allowed_code
+            access_allowed = row.event == access_allowed_code
             card_scans.append(CardScan(
-                name_id=row.NameId,
-                first_name=name_info.FirstName,
-                last_name=name_info.LastName,
-                company=name_info.CompanyName,
-                card=str(row.CardCode).strip('0').rstrip('.'),
-                scan_time=row.TimeDate,
+                name_id=row.name_id,
+                first_name=name_info.first_name,
+                last_name=name_info.last_name,
+                company=name_info.company_name,
+                card=str(row.card_code).strip('0').rstrip('.'),
+                scan_time=row.timestamp,
                 access_allowed=access_allowed,
-                device=row.Device
+                device=row.device
             ))
 
         return card_scans
 
     def get_devices(self):
-        sql = \
-            """
-                SELECT
-                    D.Device as Device,
-                    D.Name as Name
-                FROM `DEV` D
-            """
-
-        with self._acs_db.lock:
-            rows = list(self._acs_db.cursor.execute(sql))
+        rows = self._acs_session.execute(select(DEV.Device, DEV.Name)).all()
 
         result = {}
         for row in rows:
@@ -90,29 +84,18 @@ class WinDSXCardScan(object):
         return result
 
     def _get_name_info_from_id(self, name_id):
-        sql = \
-            """
-                SELECT
-                    N.ID AS NameId,
-                    N.FName AS FirstName,
-                    N.LName AS LastName,
-                    CO.Name AS CompanyName
-                FROM `NAMES` N
-                INNER JOIN `COMPANY` CO
-                    ON CO.Company = N.Company
-                WHERE N.ID = ?
-            """
+        name_data = self._acs_session.execute(
+            select(
+                NAMES.ID.label('name_id'),
+                NAMES.FName.label('first_name'),
+                NAMES.LName.label('last_name'),
+                COMPANY.Name.label('company_name'),
+            )
+            .join(COMPANY, COMPANY.Company == NAMES.Company)
+            .where(NAMES.ID == name_id)
+        ).first()
 
-        with self._acs_db.lock:
-            name_rows = list(self._acs_db.cursor.execute(sql, name_id))
+        return name_data
 
-        if len(name_rows) == 0:
-            return None
-
-        return name_rows[0]
-
-    def _get_company_from_name(self, company_name):
-        sql = "SELECT Company FROM COMPANY WHERE Name = ?"
-
-        with self._acs_db.lock:
-            return list(self._acs_db.cursor.execute(sql, company_name))[0].Company
+    def _get_company_from_name(self, company_name: str) -> COMPANY:
+        return self._acs_session.scalar(select(COMPANY).where(COMPANY.Name == company_name))

@@ -17,8 +17,6 @@ from card_auto_add.loops.ingester import Ingester
 from card_auto_add.windsx.activations import WinDSXCardActivations
 from card_auto_add.windsx.card_holders import WinDSXActiveCardHolders
 from card_auto_add.windsx.card_scan import WinDSXCardScan
-from card_auto_add.windsx.database import Database
-from card_auto_add.windsx.db.acl_group_combo import AclGroupComboHelper
 from card_auto_add.windsx.db.engine_factory import EngineFactory
 
 logger = logging.getLogger("card_access")
@@ -48,8 +46,7 @@ comm_server_watcher = CommServerWatcher(config)
 comm_server_watcher.start()
 
 acs_engine: Engine = EngineFactory.microsoft_access(config.acs_data_db_path)
-acs_db = Database(config.acs_data_db_path)
-log_db = Database(config.log_db_path)
+log_engine: Engine = EngineFactory.microsoft_access(config.log_db_path)
 
 card_activations = WinDSXCardActivations(config, acs_engine, comm_server_watcher)
 ingester = Ingester(config, card_activations, server_api)
@@ -59,7 +56,7 @@ card_holders = WinDSXActiveCardHolders(acs_engine)
 active_cards_watcher = ActiveCardsWatcher(config, server_api, card_holders)
 active_cards_watcher.start()
 
-card_scan = WinDSXCardScan(acs_db, log_db)
+card_scan = WinDSXCardScan(acs_engine, log_engine)
 card_scan_watcher = CardScanWatcher(config, server_api, card_scan)
 card_scan_watcher.start()
 
