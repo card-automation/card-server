@@ -999,18 +999,18 @@ class UdfName(AcsDataBase):
 class UDF(AcsDataBase):
     __tablename__ = 'UDF'
 
-    ID: Mapped[int] = mapped_column('ID', nullable=True)
-    LocGrp: Mapped[int] = mapped_column('LocGrp', default=0)
-    NameID: Mapped[int] = mapped_column('NameID', ForeignKey('NAMES.ID'), primary_key=True)
-    UdfNum: Mapped[int] = mapped_column('UdfNum', primary_key=True)
+    ID: Mapped[int] = mapped_column('ID', primary_key=True)
+    LocGrp: Mapped[int] = mapped_column('LocGrp', ForeignKey('LocGrp.LocGrp'), default=0)
+    NameID: Mapped[int] = mapped_column('NameID', ForeignKey('NAMES.ID'))
+    UdfNum: Mapped[int] = mapped_column('UdfNum')
     UdfText: Mapped[str] = mapped_column('UdfText', nullable=True, default='')
 
 
 class UdfSel(AcsDataBase):
     __tablename__ = 'UdfSel'
 
-    ID: Mapped[int] = mapped_column('ID', primary_key=True, nullable=True)
-    LocGrp: Mapped[int] = mapped_column('LocGrp')
+    ID: Mapped[int] = mapped_column('ID', primary_key=True)
+    LocGrp: Mapped[int] = mapped_column('LocGrp', ForeignKey('LocGrp.LocGrp'))
     UdfNum: Mapped[int] = mapped_column('UdfNum')
     ListOrder: Mapped[int] = mapped_column('ListOrder', nullable=True, default=0)
     SelText: Mapped[str] = mapped_column('SelText')
