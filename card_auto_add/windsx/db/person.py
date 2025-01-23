@@ -290,14 +290,14 @@ class Person(DbModel):
                     .where(UdfSel.LocGrp == self._location_group_id)
             ).all())
 
-        known_udfs: Sequence[UDF] = self._session.scalars(
+        known_user_defined_fields: Sequence[UDF] = self._session.scalars(
             select(UDF) \
                 .where(UDF.NameID == self._name_id) \
                 .where(UDF.LocGrp == self._location_group_id) \
                 .where(UDF.UdfNum.in_([n.UdfNum for n in known_udf_names]))
         ).all()
         id_to_udf: dict[int, UDF] = {}
-        for udf in known_udfs:
+        for udf in known_user_defined_fields:
             id_to_udf[udf.UdfNum] = udf
 
         user_defined_fields_copy = dict(self._user_defined_fields)
@@ -345,4 +345,4 @@ class Person(DbModel):
             )
 
         self._session.commit()
-        # self._in_db = True
+        self._in_db = True

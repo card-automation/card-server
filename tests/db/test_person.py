@@ -10,41 +10,46 @@ from card_auto_add.windsx.db.person import PersonHelper, Person, InvalidUdfName,
 from tests.conftest import location_group_id
 
 
-class TestPerson:
-    @pytest.fixture
-    def person_helper(self, acs_data_engine: Engine) -> PersonHelper:
-        return PersonHelper(acs_data_engine, location_group_id)
+@pytest.fixture
+def person_helper(acs_data_engine: Engine) -> PersonHelper:
+    return PersonHelper(acs_data_engine, location_group_id)
 
-    @pytest.fixture
-    def bob_the_building_manager(self, person_helper: PersonHelper) -> Person:
-        people = person_helper.by_name('BobThe', 'BuildingManager').find()
 
-        assert len(people) == 1
+@pytest.fixture
+def bob_the_building_manager(person_helper: PersonHelper) -> Person:
+    people = person_helper.by_name('BobThe', 'BuildingManager').find()
 
-        return people[0]
+    assert len(people) == 1
 
-    @pytest.fixture
-    def required_udf_name(self, acs_data_session: Session) -> UdfName:
-        udf_name: UdfName = UdfName(
-            LocGrp=location_group_id,
-            UdfNum=3,
-            Name="Required_Name",
-            Required=True,
-            Combo=False
-        )
-        acs_data_session.add(udf_name)
-        acs_data_session.commit()
+    return people[0]
 
-        return udf_name
 
-    @pytest.fixture
-    def fruit_combo_only(self, acs_data_session: Session) -> UdfName:
-        udf_name: UdfName = acs_data_session.scalar(select(UdfName).where(UdfName.UdfNum == 2))
-        udf_name.ComboOnly = True
-        acs_data_session.add(udf_name)
-        acs_data_session.commit()
+@pytest.fixture
+def required_udf_name(acs_data_session: Session) -> UdfName:
+    udf_name: UdfName = UdfName(
+        LocGrp=location_group_id,
+        UdfNum=3,
+        Name="Required_Name",
+        Required=True,
+        Combo=False
+    )
+    acs_data_session.add(udf_name)
+    acs_data_session.commit()
 
-        return udf_name
+    return udf_name
+
+
+@pytest.fixture
+def fruit_combo_only(acs_data_session: Session) -> UdfName:
+    udf_name: UdfName = acs_data_session.scalar(select(UdfName).where(UdfName.UdfNum == 2))
+    udf_name.ComboOnly = True
+    acs_data_session.add(udf_name)
+    acs_data_session.commit()
+
+    return udf_name
+
+
+class TestPersonLookup:
 
     @staticmethod
     def _assert_bob_the_building_manager(person: Person):
@@ -129,6 +134,8 @@ class TestPerson:
 
         assert ex.value.invalid_key == "INVALID_UDF"
 
+
+class TestPersonWrite:
     def test_writing_an_existing_person(self, bob_the_building_manager: Person, person_helper: PersonHelper):
         bob_the_building_manager.first_name = "Greg"
         bob_the_building_manager.last_name = "Gregory"
@@ -163,7 +170,9 @@ class TestPerson:
         person.company_id = 3
         person.user_defined_fields['ID'] = "6000"
 
+        assert not person.in_db
         person.write()
+        assert person.in_db
 
         people = person_helper.by_name("Greg", "Gregory").find()
         assert len(people) == 1
