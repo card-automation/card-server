@@ -1,10 +1,8 @@
-from typing import Required
-
 import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import UDF, UdfName
+from card_auto_add.windsx.db.models import UdfName
 from card_auto_add.windsx.db.person import PersonHelper, Person, InvalidUdfName, MissingRequiredUserDefinedField, \
     InvalidUdfSelection
 from tests.conftest import location_group_id
@@ -134,6 +132,24 @@ class TestPersonLookup:
 
         assert ex.value.invalid_key == "INVALID_UDF"
 
+    def test_lookup_udf_with_bad_location_group(self, person_helper: PersonHelper):
+        # udf has bad location group
+        # udf name and name is good location group
+
+        people = person_helper.by_udf("UDF_LocGrp_Filter", "<bad>").find()
+
+        assert len(people) == 0
+
+    def test_lookup_udf_name_with_bad_location_group(self, person_helper: PersonHelper):
+        # udf name has bad location group
+        # udf and name is good location group
+
+        # This raises an exception because we shouldn't even see the UDF_Name_LocGrp_Filter name.
+        with pytest.raises(InvalidUdfName) as ex:
+            person_helper.by_udf("UDF_Name_LocGrp_Filter", "<bad>").find()
+
+        assert ex.value.invalid_key == "UDF_Name_LocGrp_Filter"
+
 
 class TestPersonWrite:
     def test_writing_an_existing_person(self, bob_the_building_manager: Person, person_helper: PersonHelper):
@@ -247,9 +263,3 @@ class TestPersonWrite:
 
         # This works without exception because the Fruit is a valid combo fruit
         bob_the_building_manager.write()
-
-    # TODO Tests
-    # - Explicit lookups for bad location groups (udf, udf sel, udf name, company, name, card)
-    #  - Writing a name needs to look up location group?
-    # - Lookup by company (we would need to make a first class object)
-    # - Lookup on UdfSel where ComboOnly is set and UdfSel value isn't valid?
