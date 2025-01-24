@@ -222,7 +222,6 @@ class WinDSXCardActivations(object):
     def _update_card_combo_id(self, card_id, new_card_combo_id):
         card = self._session.execute(select(CARDS).where(CARDS.ID == card_id)).scalar()
         card.AclGrpComboID = new_card_combo_id
-        card.DlFlag = 1
         self._session.add(card)
         self._session.commit()
 
@@ -231,7 +230,6 @@ class WinDSXCardActivations(object):
         card.NameID = name_id
         card.StartDate = datetime.now()
         card.StopDate = self._date_never
-        card.DlFlag = 1
         card.Status = True
         self._session.add(card)
         self._session.commit()
@@ -240,7 +238,6 @@ class WinDSXCardActivations(object):
         today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
         card = self._session.execute(select(CARDS).where(CARDS.ID == card_id)).scalar()
         card.StopDate = today
-        card.DlFlag = 1
         card.Status = False
         self._session.add(card)
 
@@ -395,7 +392,7 @@ class WinDSXCardActivations(object):
         self._log.info("Comm Server update requested")
         for j in range(5):  # We'll endure up to 5 attempts
             for i in range(18):  # We'll endure 18 * 10 == 180 seconds to wait for the update before resetting
-                downloading = self._session.scalar(select(LOC.FullDlFlag))
+                downloading = self._session.scalar(select(LOC.PlFlag))
 
                 if not downloading:
                     self._log.info("Looks like everything updated!")
