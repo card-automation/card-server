@@ -1,11 +1,11 @@
 import abc
 import enum
-from typing import Optional, Union, Any, Sequence
+from typing import Optional, Any, Sequence
 
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.helpers import DbModel, guard_db_populated
+from card_auto_add.windsx.lookup.utils import DbModel, guard_db_populated
 from card_auto_add.windsx.db.models import NAMES, UDF, UdfName, CARDS, UdfSel
 
 
@@ -45,21 +45,21 @@ class _PersonSearchBase(abc.ABC):
         self._udf_criteria: dict[str, str] = {}
 
     @abc.abstractmethod
-    def _search_object(self) -> 'PersonSearch':
-        # This method allows the same methods to be on PersonHelper and PersonSearch while allowing them to be chained
-        # like a builder pattern and ensuring the PersonHelper can be re-used to find multiple people.
+    def _search_object(self) -> '_PersonSearchBuilder':
+        # This method allows the same methods to be on PersonLookup and _PersonSearchBuilder while allowing them to be
+        # chained like a builder pattern and ensuring the PersonLookup can be re-used to find multiple people.
         pass
 
-    def by_name(self, first_name: str, last_name: str) -> 'PersonSearch':
-        search: PersonSearch = self._search_object()
+    def by_name(self, first_name: str, last_name: str) -> '_PersonSearchBuilder':
+        search: _PersonSearchBuilder = self._search_object()
 
         search._criteria[_SearchCriteria.FIRST_NAME] = first_name
         search._criteria[_SearchCriteria.LAST_NAME] = last_name
 
         return search
 
-    def by_udf(self, udf_name: str, udf_text: str) -> 'PersonSearch':
-        search: PersonSearch = self._search_object()
+    def by_udf(self, udf_name: str, udf_text: str) -> '_PersonSearchBuilder':
+        search: _PersonSearchBuilder = self._search_object()
 
         if _SearchCriteria.UDF not in search._criteria:
             search._criteria[_SearchCriteria.UDF] = set()
@@ -69,15 +69,15 @@ class _PersonSearchBase(abc.ABC):
 
         return search
 
-    def by_card(self, code: int) -> 'PersonSearch':
-        search: PersonSearch = self._search_object()
+    def by_card(self, code: int) -> '_PersonSearchBuilder':
+        search: _PersonSearchBuilder = self._search_object()
 
         search._criteria[_SearchCriteria.CARD_CODE] = code
 
         return search
 
-    def by_company(self, company: int) -> 'PersonSearch':
-        search: PersonSearch = self._search_object()
+    def by_company(self, company: int) -> '_PersonSearchBuilder':
+        search: _PersonSearchBuilder = self._search_object()
 
         search._criteria[_SearchCriteria.COMPANY_ID] = company
 
@@ -150,17 +150,17 @@ class _PersonSearchBase(abc.ABC):
         return [Person(self._engine, self._location_group_id, name_id) for name_id in name_ids]
 
 
-class PersonSearch(_PersonSearchBase):
-    def _search_object(self) -> 'PersonSearch':
+class _PersonSearchBuilder(_PersonSearchBase):
+    def _search_object(self) -> '_PersonSearchBuilder':
         return self
 
 
-class PersonHelper(_PersonSearchBase):
+class PersonLookup(_PersonSearchBase):
     def __init__(self, engine: Engine, location_group_id: int):
         super().__init__(engine, location_group_id)
 
-    def _search_object(self) -> 'PersonSearch':
-        return PersonSearch(self._engine, self._location_group_id)
+    def _search_object(self) -> '_PersonSearchBuilder':
+        return _PersonSearchBuilder(self._engine, self._location_group_id)
 
     def new(self) -> 'Person':
         return Person(

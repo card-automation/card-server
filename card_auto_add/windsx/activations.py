@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from card_auto_add.config import Config
 from card_auto_add.data_signing import DataSigning
 from card_auto_add.loops.comm_server_watcher import CommServerWatcher
-from card_auto_add.windsx.db.acl_group_combo import AclGroupComboSet, AclGroupComboHelper
+from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupComboLookup
 from card_auto_add.windsx.db.models import COMPANY, UdfName, UDF, NAMES, CARDS, LocCards, AclGrpCombo, AclGrp, LOC, \
     DGRP, ACL
 
@@ -41,7 +41,7 @@ class WinDSXCardActivations(object):
         self._config: Config = config
         self._acs_engine: Engine = acs_engine
         self._session: Session = Session(acs_engine)
-        self._acl_group_combo_helper: AclGroupComboHelper = AclGroupComboHelper(acs_engine,
+        self._acl_group_combo_lookup: AclGroupComboLookup = AclGroupComboLookup(acs_engine,
                                                                                 3)  # TODO Don't hardcode location id
         self._default_acl = config.windsx_acl
         self._log = config.logger
@@ -56,7 +56,7 @@ class WinDSXCardActivations(object):
         self._log.info(f"Activating card {card_info.card}")
         self._slack_log.info(f"Activating card {card_info.card} for {card_info.first_name} {card_info.last_name}")
 
-        to_add_group_combo: AclGroupComboSet = self._acl_group_combo_helper.by_names(
+        to_add_group_combo: AclGroupComboSet = self._acl_group_combo_lookup.by_names(
             self._default_acl)  # TODO This shouldn't be hardcoded
 
         name_id = self._find_or_create_name(card_info)
@@ -68,7 +68,7 @@ class WinDSXCardActivations(object):
             card_combo_id = to_add_group_combo.id
             card_id = self._create_card(name_id, card_info.card, card_combo_id)
         else:
-            existing_group_combo: AclGroupComboSet = self._acl_group_combo_helper.by_id(card_combo_id)
+            existing_group_combo: AclGroupComboSet = self._acl_group_combo_lookup.by_id(card_combo_id)
             new_group_combo: AclGroupComboSet = existing_group_combo.with_names(to_add_group_combo.names)
 
             # We check the DB just in case the existing card combo id is 0 but the new group is different

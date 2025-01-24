@@ -29,7 +29,7 @@ class AclGroupNameNotInDatabase(_AclGroupNameNotFound):
         super().__init__(f"\"{name}\" was not found in the database", name)
 
 
-class AclGroupComboHelper:
+class AclGroupComboLookup:
     def __init__(self, engine: Engine, location_group_id: int):
         self._location_group_id = location_group_id
         self._engine = engine

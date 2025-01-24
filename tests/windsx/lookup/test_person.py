@@ -3,19 +3,19 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.models import UdfName
-from card_auto_add.windsx.db.person import PersonHelper, Person, InvalidUdfName, MissingRequiredUserDefinedField, \
+from card_auto_add.windsx.lookup.person import PersonLookup, Person, InvalidUdfName, MissingRequiredUserDefinedField, \
     InvalidUdfSelection
 from tests.conftest import location_group_id
 
 
 @pytest.fixture
-def person_helper(acs_data_engine: Engine) -> PersonHelper:
-    return PersonHelper(acs_data_engine, location_group_id)
+def person_lookup(acs_data_engine: Engine) -> PersonLookup:
+    return PersonLookup(acs_data_engine, location_group_id)
 
 
 @pytest.fixture
-def bob_the_building_manager(person_helper: PersonHelper) -> Person:
-    people = person_helper.by_name('BobThe', 'BuildingManager').find()
+def bob_the_building_manager(person_lookup: PersonLookup) -> Person:
+    people = person_lookup.by_name('BobThe', 'BuildingManager').find()
 
     assert len(people) == 1
 
@@ -75,32 +75,32 @@ class TestPersonLookup:
         assert len(person.user_defined_fields) == 0
         # TODO assert cards
 
-    def test_lookup_by_name(self, person_helper: PersonHelper):
-        people = person_helper.by_name('BobThe', 'BuildingManager').find()
+    def test_lookup_by_name(self, person_lookup: PersonLookup):
+        people = person_lookup.by_name('BobThe', 'BuildingManager').find()
 
         assert len(people) == 1
 
         person = people[0]
         self._assert_bob_the_building_manager(person)
 
-    def test_lookup_by_udf(self, person_helper: PersonHelper):
-        people = person_helper.by_udf("ID", "5000").find()
+    def test_lookup_by_udf(self, person_lookup: PersonLookup):
+        people = person_lookup.by_udf("ID", "5000").find()
 
         assert len(people) == 1
 
         person = people[0]
         self._assert_bob_the_building_manager(person)
 
-    def test_lookup_by_udf_select(self, person_helper: PersonHelper):
-        people = person_helper.by_udf("Fruit", "Apple").find()
+    def test_lookup_by_udf_select(self, person_lookup: PersonLookup):
+        people = person_lookup.by_udf("Fruit", "Apple").find()
 
         assert len(people) == 1
 
         person = people[0]
         self._assert_bob_the_building_manager(person)
 
-    def test_lookup_by_multiple_udf(self, person_helper: PersonHelper):
-        people = person_helper \
+    def test_lookup_by_multiple_udf(self, person_lookup: PersonLookup):
+        people = person_lookup \
             .by_udf("ID", "5000") \
             .by_udf("Fruit", "Apple") \
             .find()
@@ -110,49 +110,49 @@ class TestPersonLookup:
         person = people[0]
         self._assert_bob_the_building_manager(person)
 
-    def test_lookup_by_card(self, person_helper: PersonHelper):
-        people = person_helper.by_card(3000).find()
+    def test_lookup_by_card(self, person_lookup: PersonLookup):
+        people = person_lookup.by_card(3000).find()
 
         assert len(people) == 1
 
         person = people[0]
         self._assert_bob_the_building_manager(person)
 
-    def test_lookup_by_company_id(self, person_helper: PersonHelper):
-        people = person_helper.by_company(2).find()
+    def test_lookup_by_company_id(self, person_lookup: PersonLookup):
+        people = person_lookup.by_company(2).find()
 
         assert len(people) == 1
 
         person = people[0]
         self._assert_ray_securitay(person)
 
-    def test_lookup_on_invalid_udf_name(self, person_helper: PersonHelper):
+    def test_lookup_on_invalid_udf_name(self, person_lookup: PersonLookup):
         with pytest.raises(InvalidUdfName) as ex:
-            person_helper.by_udf("INVALID_UDF", "").find()
+            person_lookup.by_udf("INVALID_UDF", "").find()
 
         assert ex.value.invalid_key == "INVALID_UDF"
 
-    def test_lookup_udf_with_bad_location_group(self, person_helper: PersonHelper):
+    def test_lookup_udf_with_bad_location_group(self, person_lookup: PersonLookup):
         # udf has bad location group
         # udf name and name is good location group
 
-        people = person_helper.by_udf("UDF_LocGrp_Filter", "<bad>").find()
+        people = person_lookup.by_udf("UDF_LocGrp_Filter", "<bad>").find()
 
         assert len(people) == 0
 
-    def test_lookup_udf_name_with_bad_location_group(self, person_helper: PersonHelper):
+    def test_lookup_udf_name_with_bad_location_group(self, person_lookup: PersonLookup):
         # udf name has bad location group
         # udf and name is good location group
 
         # This raises an exception because we shouldn't even see the UDF_Name_LocGrp_Filter name.
         with pytest.raises(InvalidUdfName) as ex:
-            person_helper.by_udf("UDF_Name_LocGrp_Filter", "<bad>").find()
+            person_lookup.by_udf("UDF_Name_LocGrp_Filter", "<bad>").find()
 
         assert ex.value.invalid_key == "UDF_Name_LocGrp_Filter"
 
 
 class TestPersonWrite:
-    def test_writing_an_existing_person(self, bob_the_building_manager: Person, person_helper: PersonHelper):
+    def test_writing_an_existing_person(self, bob_the_building_manager: Person, person_lookup: PersonLookup):
         bob_the_building_manager.first_name = "Greg"
         bob_the_building_manager.last_name = "Gregory"
         bob_the_building_manager.company_id = 3
@@ -161,7 +161,7 @@ class TestPersonWrite:
 
         bob_the_building_manager.write()
 
-        people = person_helper.by_name("Greg", "Gregory").find()
+        people = person_lookup.by_name("Greg", "Gregory").find()
         assert len(people) == 1
         new_person = people[0]
 
@@ -170,8 +170,8 @@ class TestPersonWrite:
         assert bob_the_building_manager.company_id == new_person.company_id
         assert bob_the_building_manager.user_defined_fields == new_person.user_defined_fields
 
-    def test_new_person(self, person_helper: PersonHelper):
-        person: Person = person_helper.new()
+    def test_new_person(self, person_lookup: PersonLookup):
+        person: Person = person_lookup.new()
 
         assert not person.in_db
         assert person.first_name is None
@@ -179,8 +179,8 @@ class TestPersonWrite:
         assert person.company_id is None
         assert person.user_defined_fields == {}
 
-    def test_writing_a_new_person(self, person_helper: PersonHelper):
-        person: Person = person_helper.new()
+    def test_writing_a_new_person(self, person_lookup: PersonLookup):
+        person: Person = person_lookup.new()
         person.first_name = "Greg"
         person.last_name = "Gregory"
         person.company_id = 3
@@ -190,7 +190,7 @@ class TestPersonWrite:
         person.write()
         assert person.in_db
 
-        people = person_helper.by_name("Greg", "Gregory").find()
+        people = person_lookup.by_name("Greg", "Gregory").find()
         assert len(people) == 1
         new_person = people[0]
 
@@ -216,12 +216,12 @@ class TestPersonWrite:
 
         assert ex.value.invalid_key == bad_udf_name
 
-    def test_removing_a_udf(self, bob_the_building_manager: Person, person_helper: PersonHelper):
+    def test_removing_a_udf(self, bob_the_building_manager: Person, person_lookup: PersonLookup):
         del bob_the_building_manager.user_defined_fields['ID']
 
         bob_the_building_manager.write()
 
-        people = person_helper.by_name(bob_the_building_manager.first_name, bob_the_building_manager.last_name).find()
+        people = person_lookup.by_name(bob_the_building_manager.first_name, bob_the_building_manager.last_name).find()
         assert len(people) == 1
         new_person = people[0]
 
