@@ -1,4 +1,5 @@
 from typing import List
+from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import Engine, select
@@ -129,7 +130,9 @@ class TestAclGroupComboLookup:
 
 
 class TestAclGroupComboWrite:
-    def test_writing_non_existent_acl_combo_to_db(self, acl_group_combo_lookup: AclGroupComboLookup):
+    def test_writing_non_existent_acl_combo_to_db(self,
+                                                  acl_group_combo_lookup: AclGroupComboLookup,
+                                                  acs_updated_callback: Mock):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1, _tenant_2)
         assert not acl_group_combo.in_db
 
@@ -139,6 +142,8 @@ class TestAclGroupComboWrite:
         assert acl_group_combo.names == frozenset({_tenant_1, _tenant_2})
         assert acl_group_combo.in_db
 
+        acs_updated_callback.assert_called_once_with(acl_group_combo)
+
         # Now to make sure we would generate the same acl group combo based on the id:
         new_acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(acl_group_combo.id)
         assert new_acl_group_combo.id == acl_group_combo.id
@@ -146,7 +151,8 @@ class TestAclGroupComboWrite:
         assert new_acl_group_combo.in_db == acl_group_combo.in_db
 
     def test_nothing_writes_if_in_db_already(self, acs_data_engine: Engine,
-                                             acl_group_combo_lookup: AclGroupComboLookup):
+                                             acl_group_combo_lookup: AclGroupComboLookup,
+                                             acs_updated_callback: Mock):
         session = Session(acs_data_engine)
         starting_rows = session.execute(select(AclGrpCombo)).all()
 
@@ -155,17 +161,24 @@ class TestAclGroupComboWrite:
 
         acl_group_combo.write()
 
+        acs_updated_callback.assert_not_called()
+
         ending_rows = session.execute(select(AclGrpCombo)).all()
 
         assert starting_rows == ending_rows
 
-    def test_nothing_writes_if_empty(self, acs_data_engine: Engine, acl_group_combo_lookup: AclGroupComboLookup):
+    def test_nothing_writes_if_empty(self,
+                                     acs_data_engine: Engine,
+                                     acl_group_combo_lookup: AclGroupComboLookup,
+                                     acs_updated_callback: Mock):
         session = Session(acs_data_engine)
         starting_rows = session.execute(select(AclGrpCombo)).all()
 
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.empty()
 
         acl_group_combo.write()
+
+        acs_updated_callback.assert_not_called()
 
         ending_rows = session.execute(select(AclGrpCombo)).all()
 

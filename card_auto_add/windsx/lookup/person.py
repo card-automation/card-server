@@ -341,3 +341,4 @@ class Person(DbModel):
 
         self._session.commit()
         self._in_db = True
+        self._lookup_info.updated_callback(self)

@@ -219,3 +219,4 @@ class AclGroupComboSet:
         self._session.commit()
 
         self._in_db = True  # Now we're in the database :)
+        self._lookup_info.updated_callback(self)

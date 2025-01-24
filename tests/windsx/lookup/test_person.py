@@ -1,3 +1,5 @@
+from unittest.mock import Mock
+
 import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
@@ -147,7 +149,10 @@ class TestPersonLookup:
 
 
 class TestPersonWrite:
-    def test_writing_an_existing_person(self, bob_the_building_manager: Person, person_lookup: PersonLookup):
+    def test_writing_an_existing_person(self,
+                                        bob_the_building_manager: Person,
+                                        person_lookup: PersonLookup,
+                                        acs_updated_callback: Mock):
         bob_the_building_manager.first_name = "Greg"
         bob_the_building_manager.last_name = "Gregory"
         bob_the_building_manager.company_id = 3
@@ -160,12 +165,16 @@ class TestPersonWrite:
         assert len(people) == 1
         new_person = people[0]
 
+        acs_updated_callback.assert_called_once_with(bob_the_building_manager)
+
         assert bob_the_building_manager.first_name == new_person.first_name
         assert bob_the_building_manager.last_name == new_person.last_name
         assert bob_the_building_manager.company_id == new_person.company_id
         assert bob_the_building_manager.user_defined_fields == new_person.user_defined_fields
 
-    def test_new_person(self, person_lookup: PersonLookup):
+    def test_new_person(self,
+                        person_lookup: PersonLookup,
+                        acs_updated_callback: Mock):
         person: Person = person_lookup.new()
 
         assert not person.in_db
@@ -174,7 +183,11 @@ class TestPersonWrite:
         assert person.company_id is None
         assert person.user_defined_fields == {}
 
-    def test_writing_a_new_person(self, person_lookup: PersonLookup):
+        acs_updated_callback.assert_not_called()
+
+    def test_writing_a_new_person(self,
+                                  person_lookup: PersonLookup,
+                                  acs_updated_callback: Mock):
         person: Person = person_lookup.new()
         person.first_name = "Greg"
         person.last_name = "Gregory"
@@ -185,6 +198,8 @@ class TestPersonWrite:
         person.write()
         assert person.in_db
 
+        acs_updated_callback.assert_called_once_with(person)
+
         people = person_lookup.by_name("Greg", "Gregory").find()
         assert len(people) == 1
         new_person = people[0]
@@ -194,15 +209,21 @@ class TestPersonWrite:
         assert person.company_id == new_person.company_id
         assert person.user_defined_fields == new_person.user_defined_fields
 
-    def test_writing_a_required_udf(self, required_udf_name: UdfName, bob_the_building_manager: Person):
+    def test_writing_without_a_required_udf(self,
+                                            required_udf_name: UdfName,
+                                            bob_the_building_manager: Person,
+                                            acs_updated_callback: Mock):
         assert required_udf_name.Name not in bob_the_building_manager.user_defined_fields
 
         with pytest.raises(MissingRequiredUserDefinedField) as ex:
             bob_the_building_manager.write()
 
         assert ex.value.missing_field == required_udf_name.Name
+        acs_updated_callback.assert_not_called()
 
-    def test_writing_an_invalid_udf(self, bob_the_building_manager: Person):
+    def test_writing_an_invalid_udf(self,
+                                    bob_the_building_manager: Person,
+                                    acs_updated_callback: Mock):
         bad_udf_name = "spaghetti"
         bob_the_building_manager.user_defined_fields[bad_udf_name] = "meatballs"
 
@@ -210,12 +231,19 @@ class TestPersonWrite:
             bob_the_building_manager.write()
 
         assert ex.value.invalid_key == bad_udf_name
+        acs_updated_callback.assert_not_called()
 
-    def test_removing_a_udf(self, bob_the_building_manager: Person, person_lookup: PersonLookup):
+    def test_removing_a_udf(self,
+                            bob_the_building_manager: Person,
+                            person_lookup: PersonLookup,
+                            acs_updated_callback: Mock):
         del bob_the_building_manager.user_defined_fields['ID']
 
         bob_the_building_manager.write()
 
+        acs_updated_callback.assert_called_once_with(bob_the_building_manager)
+
+        # Look it up again because we know it was deleted on the in memory instance, but need to check the database.
         people = person_lookup.by_name(bob_the_building_manager.first_name, bob_the_building_manager.last_name).find()
         assert len(people) == 1
         new_person = people[0]
@@ -223,11 +251,16 @@ class TestPersonWrite:
         assert len(new_person.user_defined_fields) == 1
         assert 'ID' not in new_person.user_defined_fields
 
-    def test_removing_a_required_udf(self, required_udf_name: UdfName, bob_the_building_manager: Person):
+    def test_removing_a_required_udf(self,
+                                     required_udf_name: UdfName,
+                                     bob_the_building_manager: Person,
+                                     acs_updated_callback: Mock):
         assert required_udf_name.Name not in bob_the_building_manager.user_defined_fields
         bob_the_building_manager.user_defined_fields[required_udf_name.Name] = "some value"
 
         bob_the_building_manager.write()  # Required field is there, should write out the UDF
+
+        acs_updated_callback.assert_called_once_with(bob_the_building_manager)
 
         del bob_the_building_manager.user_defined_fields[required_udf_name.Name]
 
@@ -236,15 +269,23 @@ class TestPersonWrite:
 
         assert ex.value.missing_field == required_udf_name.Name
 
-    def test_writing_an_invalid_udf_select(self, bob_the_building_manager: Person):
+        # The call was from earlier, but there's no "assert no more invocations" so we just re-assert we only have the
+        # one call from before.
+        acs_updated_callback.assert_called_once_with(bob_the_building_manager)
+
+    def test_writing_an_invalid_udf_select(self,
+                                           bob_the_building_manager: Person,
+                                           acs_updated_callback: Mock):
         bob_the_building_manager.user_defined_fields["Fruit"] = "Ketchup"
 
         # This works without exception because the Fruit isn't ComboOnly
         bob_the_building_manager.write()
+        acs_updated_callback.assert_called_once_with(bob_the_building_manager)
 
     def test_writing_an_invalid_udf_select_combo_only(self,
                                                       bob_the_building_manager: Person,
-                                                      fruit_combo_only: UdfName):
+                                                      fruit_combo_only: UdfName,
+                                                      acs_updated_callback: Mock):
         bob_the_building_manager.user_defined_fields["Fruit"] = "Ketchup"
 
         with pytest.raises(InvalidUdfSelection) as ex:
@@ -252,9 +293,14 @@ class TestPersonWrite:
 
         assert ex.value.invalid_key == "Fruit"
         assert ex.value.invalid_value == "Ketchup"
+        acs_updated_callback.assert_not_called()
 
-    def test_writing_an_valid_udf_select_combo_only(self, bob_the_building_manager: Person, fruit_combo_only: UdfName):
+    def test_writing_an_valid_udf_select_combo_only(self,
+                                                    bob_the_building_manager: Person,
+                                                    fruit_combo_only: UdfName,
+                                                    acs_updated_callback: Mock):
         bob_the_building_manager.user_defined_fields["Fruit"] = "Pear"
 
         # This works without exception because the Fruit is a valid combo fruit
         bob_the_building_manager.write()
+        acs_updated_callback.assert_called_once_with(bob_the_building_manager)
