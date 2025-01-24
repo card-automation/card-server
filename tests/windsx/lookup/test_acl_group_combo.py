@@ -4,10 +4,10 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupNameNotInCombo, AclGroupNameNotInDatabase, \
-    AclGroupComboLookup
 from card_auto_add.windsx.db.models import AclGrpCombo
-from tests.conftest import acs_data_engine, location_group_id
+from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupNameNotInCombo, \
+    AclGroupNameNotInDatabase, AclGroupComboLookup
+from tests.conftest import acs_data_engine
 
 
 class TestAclGroupCombo:
@@ -21,10 +21,6 @@ class TestAclGroupCombo:
     _tenant_1 = "Tenant 1"
     _tenant_2 = "Tenant 2"
     _tenant_3 = "Tenant 3"
-
-    @pytest.fixture
-    def acl_group_combo_lookup(self, acs_data_engine: Engine) -> AclGroupComboLookup:
-        return AclGroupComboLookup(acs_data_engine, location_group_id)
 
     def test_empty(self, acl_group_combo_lookup: AclGroupComboLookup):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.empty()

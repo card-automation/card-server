@@ -9,11 +9,6 @@ from tests.conftest import location_group_id
 
 
 @pytest.fixture
-def person_lookup(acs_data_engine: Engine) -> PersonLookup:
-    return PersonLookup(acs_data_engine, location_group_id)
-
-
-@pytest.fixture
 def bob_the_building_manager(person_lookup: PersonLookup) -> Person:
     people = person_lookup.by_name('BobThe', 'BuildingManager').find()
 

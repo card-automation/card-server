@@ -1,9 +1,15 @@
+from typing import Callable, Any
+from unittest.mock import Mock
+
 import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.engine_factory import EngineFactory
 from card_auto_add.windsx.db.models import *
+from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_auto_add.windsx.lookup.person import PersonLookup
+from card_auto_add.windsx.lookup.utils import LookupInfo
 
 location_group_id = 3
 main_location_id = 3
@@ -304,3 +310,27 @@ def acs_data_engine() -> Engine:
 def acs_data_session(acs_data_engine: Engine) -> Session:
     # This is required when we need to make a new db entry in another test fixture. The session must stay open.
     return Session(acs_data_engine)
+
+
+@pytest.fixture
+def acs_updated_callback() -> Mock:
+    return Mock()
+
+
+@pytest.fixture
+def lookup_info(acs_data_engine: Engine, acs_updated_callback: Mock) -> LookupInfo:
+    return LookupInfo(
+        acs_engine=acs_data_engine,
+        location_group_id=location_group_id,
+        updated_callback=acs_updated_callback
+    )
+
+
+@pytest.fixture
+def person_lookup(lookup_info: LookupInfo) -> PersonLookup:
+    return PersonLookup(lookup_info)
+
+
+@pytest.fixture
+def acl_group_combo_lookup(lookup_info: LookupInfo) -> AclGroupComboLookup:
+    return AclGroupComboLookup(lookup_info)

@@ -2,11 +2,11 @@ import abc
 import enum
 from typing import Optional, Any, Sequence
 
-from sqlalchemy import Engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.lookup.utils import DbModel, guard_db_populated
 from card_auto_add.windsx.db.models import NAMES, UDF, UdfName, CARDS, UdfSel
+from card_auto_add.windsx.lookup.utils import DbModel, guard_db_populated, LookupInfo
 
 
 class InvalidUdfName(Exception):
@@ -37,10 +37,10 @@ class _SearchCriteria(enum.Enum):
 
 
 class _PersonSearchBase(abc.ABC):
-    def __init__(self, engine: Engine, location_group_id: int):
-        self._location_group_id = location_group_id
-        self._engine = engine
-        self._session = Session(engine)
+    def __init__(self, lookup_info: LookupInfo):
+        self._lookup_info: LookupInfo = lookup_info
+        self._location_group_id: int = self._lookup_info.location_group_id
+        self._session = Session(lookup_info.acs_engine)
         self._criteria: dict[_SearchCriteria, Any] = {}
         self._udf_criteria: dict[str, str] = {}
 
@@ -86,7 +86,7 @@ class _PersonSearchBase(abc.ABC):
     def __get_udf_name_ids(self) -> Optional[set[int]]:
         udf_names_and_ids = self._session.execute(
             select(UdfName.UdfNum, UdfName.Name) \
-                .where(UdfName.LocGrp == self._location_group_id) \
+                .where(UdfName.LocGrp == self._lookup_info.location_group_id) \
                 .where(UdfName.Name.in_(self._udf_criteria.keys()))
         ).all()
 
@@ -147,7 +147,7 @@ class _PersonSearchBase(abc.ABC):
 
         name_ids = self._session.scalars(statement).all()
 
-        return [Person(self._engine, self._location_group_id, name_id) for name_id in name_ids]
+        return [Person(self._lookup_info, name_id) for name_id in name_ids]
 
 
 class _PersonSearchBuilder(_PersonSearchBase):
@@ -156,29 +156,24 @@ class _PersonSearchBuilder(_PersonSearchBase):
 
 
 class PersonLookup(_PersonSearchBase):
-    def __init__(self, engine: Engine, location_group_id: int):
-        super().__init__(engine, location_group_id)
+    def __init__(self, lookup_info: LookupInfo):
+        super().__init__(lookup_info)
 
     def _search_object(self) -> '_PersonSearchBuilder':
-        return _PersonSearchBuilder(self._engine, self._location_group_id)
+        return _PersonSearchBuilder(self._lookup_info)
 
     def new(self) -> 'Person':
-        return Person(
-            self._engine,
-            self._location_group_id,
-            0
-        )
+        return Person(self._lookup_info, 0)
 
 
 class Person(DbModel):
     def __init__(self,
-                 engine: Engine,
-                 location_group_id: int,
+                 lookup_info: LookupInfo,
                  name_id: int):
         super().__init__()
-        self._location_group_id = location_group_id
-        self._engine = engine
-        self._session = Session(engine)
+        self._lookup_info: LookupInfo = lookup_info
+        self._location_group_id: int = self._lookup_info.location_group_id
+        self._session = Session(lookup_info.acs_engine)
         self._name_id: int = name_id
         self._first_name: Optional[str] = None
         self._last_name: Optional[str] = None

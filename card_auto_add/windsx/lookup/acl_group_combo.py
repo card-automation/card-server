@@ -5,6 +5,7 @@ from sqlalchemy import Engine, select, distinct
 from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.models import AclGrpCombo, AclGrpName
+from card_auto_add.windsx.lookup.utils import LookupInfo
 
 StringOrFrozenSet = Union[str, frozenset[str], Iterable[str]]
 
@@ -30,21 +31,20 @@ class AclGroupNameNotInDatabase(_AclGroupNameNotFound):
 
 
 class AclGroupComboLookup:
-    def __init__(self, engine: Engine, location_group_id: int):
-        self._location_group_id = location_group_id
-        self._engine = engine
+    def __init__(self, lookup_info: LookupInfo):
+        self._lookup_info: LookupInfo = lookup_info
 
     def empty(self) -> 'AclGroupComboSet':
-        return AclGroupComboSet(self._engine, self._location_group_id, 0)
+        return AclGroupComboSet(self._lookup_info, 0)
 
     def by_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet':
         return self.empty().with_names(*names)
 
     def by_id(self, combo_id: int):
-        return AclGroupComboSet(self._engine, self._location_group_id, combo_id)
+        return AclGroupComboSet(self._lookup_info, combo_id)
 
     def all(self) -> List['AclGroupComboSet']:
-        session = Session(self._engine)
+        session = Session(self._lookup_info.acs_engine)
         combo_id_rows = session.execute(select(distinct(AclGrpCombo.ComboID))).all()
 
         return [self.by_id(row[0]) for row in combo_id_rows]
@@ -52,13 +52,12 @@ class AclGroupComboLookup:
 
 class AclGroupComboSet:
     def __init__(self,
-                 engine: Engine,
-                 location_group_id: int,
+                 lookup_info: LookupInfo,
                  combo_id: int
                  ):
-        self._location_group_id = location_group_id
-        self._engine = engine
-        self._session = Session(engine)
+        self._lookup_info: LookupInfo = lookup_info
+        self._location_group_id: int = self._lookup_info.location_group_id
+        self._session = Session(self._lookup_info.acs_engine)
         self._combo_id = combo_id
         self._names: Optional[frozenset[[str]]] = None
         self._in_db: Optional[bool] = None
@@ -175,14 +174,10 @@ class AclGroupComboSet:
         for new_combo_id, value in grouped_by_combo_id:
             acl_name_ids = set([x[0] for x in value])
             if acl_name_ids == wanted_name_ids:  # Oh good, we found an exact match
-                return AclGroupComboSet(
-                    self._engine,
-                    self._location_group_id,
-                    new_combo_id
-                )
+                return AclGroupComboSet(self._lookup_info, new_combo_id)
 
         # This doesn't exist, so we create one, update the names manually, and mark it as not in the database
-        result = AclGroupComboSet(self._engine, self._location_group_id, 0)
+        result = AclGroupComboSet(self._lookup_info, 0)
         result._names = all_names
         result._in_db = False
 
