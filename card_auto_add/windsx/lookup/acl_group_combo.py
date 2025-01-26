@@ -1,11 +1,11 @@
 from itertools import groupby
 from typing import Optional, Union, Iterable, Dict, Collection, List
 
-from sqlalchemy import Engine, select, distinct
+from sqlalchemy import select, distinct
 from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.models import AclGrpCombo, AclGrpName
-from card_auto_add.windsx.lookup.utils import LookupInfo
+from card_auto_add.windsx.lookup.utils import LookupInfo, guard_db_populated, DbModel
 
 StringOrFrozenSet = Union[str, frozenset[str], Iterable[str]]
 
@@ -45,16 +45,22 @@ class AclGroupComboLookup:
 
     def all(self) -> List['AclGroupComboSet']:
         session = Session(self._lookup_info.acs_engine)
-        combo_id_rows = session.execute(select(distinct(AclGrpCombo.ComboID))).all()
+        combo_id_rows = session.execute(
+            select(distinct(AclGrpCombo.ComboID))
+            .join(AclGrpName, AclGrpName.ID == AclGrpCombo.AclGrpNameID)
+            .where(AclGrpCombo.LocGrp == self._lookup_info.location_group_id)
+            .where(AclGrpName.LocGrp == self._lookup_info.location_group_id)
+        ).all()
 
         return [self.by_id(row[0]) for row in combo_id_rows]
 
 
-class AclGroupComboSet:
+class AclGroupComboSet(DbModel):
     def __init__(self,
                  lookup_info: LookupInfo,
                  combo_id: int
                  ):
+        super().__init__()
         self._lookup_info: LookupInfo = lookup_info
         self._location_group_id: int = self._lookup_info.location_group_id
         self._session = Session(self._lookup_info.acs_engine)
@@ -67,17 +73,13 @@ class AclGroupComboSet:
         return self._combo_id
 
     @property
+    @guard_db_populated
     def names(self) -> frozenset[str]:
-        if self._names is None:
-            self._populate_from_db()
-
         return self._names
 
     @property
+    @guard_db_populated
     def in_db(self) -> bool:
-        if self._in_db is None:
-            self._populate_from_db()
-
         return self._in_db
 
     def __str__(self):
@@ -85,9 +87,13 @@ class AclGroupComboSet:
         return f"{self.id}: {names}"
 
     def _populate_from_db(self):
-        # noinspection PyTypeChecker
-        query = select(AclGrpCombo.AclGrpNameID).where(AclGrpCombo.ComboID == self._combo_id)
-        name_id_rows = self._session.execute(query).all()
+        name_id_rows = self._session.execute(
+            select(AclGrpCombo.AclGrpNameID)
+            .join(AclGrpName, AclGrpName.ID == AclGrpCombo.AclGrpNameID)
+            .where(AclGrpCombo.ComboID == self._combo_id)
+            .where(AclGrpCombo.LocGrp == self._location_group_id)
+            .where(AclGrpName.LocGrp == self._location_group_id)
+        ).all()
 
         if len(name_id_rows) == 0:
             self._names = frozenset()
@@ -98,7 +104,7 @@ class AclGroupComboSet:
         self._in_db = True
 
         # Let's grab our names
-        name_ids = set(row[0] for row in name_id_rows)
+        name_ids = set(row.AclGrpNameID for row in name_id_rows)
         id_to_names = self._names_by_id(name_ids)
 
         self._names = frozenset(id_to_names.values())
@@ -118,8 +124,10 @@ class AclGroupComboSet:
         return result
 
     def _names_by_id(self, name_ids: Collection[int]) -> Dict[int, str]:
-        query = select(AclGrpName.ID, AclGrpName.Name).where(AclGrpName.ID.in_(name_ids))
-        acl_group_name_rows = self._session.execute(query).all()
+        acl_group_name_rows = self._session.execute(
+            select(AclGrpName.ID, AclGrpName.Name)
+            .where(AclGrpName.ID.in_(name_ids))
+        ).all()
 
         id_to_names = {}
 
@@ -132,8 +140,11 @@ class AclGroupComboSet:
         return id_to_names
 
     def _name_ids_by_name(self, names: Collection[str]) -> Dict[str, int]:
-        query = select(AclGrpName.ID, AclGrpName.Name).where(AclGrpName.Name.in_(names))
-        acl_group_name_rows = self._session.execute(query).all()
+        acl_group_name_rows = self._session.execute(
+            select(AclGrpName.ID, AclGrpName.Name)
+            .where(AclGrpName.Name.in_(names))
+            .where(AclGrpName.LocGrp == self._location_group_id)
+        ).all()
 
         names_to_ids = {}
 
@@ -167,12 +178,14 @@ class AclGroupComboSet:
     def _get_acl_by_names(self, all_names):
         wanted_name_ids = set(self._name_ids_by_name(all_names).values())
 
-        query = select(AclGrpCombo.AclGrpNameID, AclGrpCombo.ComboID)
-        acl_combos = self._session.execute(query).all()
+        acl_combos = self._session.execute(
+            select(AclGrpCombo.AclGrpNameID, AclGrpCombo.ComboID)
+            .where(AclGrpCombo.LocGrp == self._location_group_id)
+        ).all()
         grouped_by_combo_id = groupby(acl_combos, lambda x: x[1])  # Group by the Combo ID
 
         for new_combo_id, value in grouped_by_combo_id:
-            acl_name_ids = set([x[0] for x in value])
+            acl_name_ids = set([x.AclGrpNameID for x in value])
             if acl_name_ids == wanted_name_ids:  # Oh good, we found an exact match
                 return AclGroupComboSet(self._lookup_info, new_combo_id)
 

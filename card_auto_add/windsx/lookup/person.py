@@ -181,7 +181,6 @@ class Person(DbModel):
         self._user_defined_fields: Optional[dict[str, str]] = None
 
     @property
-    @guard_db_populated
     def id(self) -> int:
         return self._name_id
 

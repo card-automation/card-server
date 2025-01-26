@@ -16,6 +16,7 @@ _main_building_access = "Main Building Access"
 _tenant_1 = "Tenant 1"
 _tenant_2 = "Tenant 2"
 _tenant_3 = "Tenant 3"
+_bad_location_group_name = "Bad Location Group Name"
 
 
 class TestAclGroupComboLookup:
@@ -128,6 +129,46 @@ class TestAclGroupComboLookup:
         assertions(109, frozenset({_tenant_2}))
         assertions(110, frozenset({_tenant_3}))
 
+    def test_by_id_that_is_in_another_location_group(self,
+                                                     acl_group_combo_lookup: AclGroupComboLookup):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(200)
+
+        assert acl_group_combo.id == 200
+        assert len(acl_group_combo.names) == 0
+        assert not acl_group_combo.in_db
+
+    def test_by_id_where_name_is_in_another_location_group(self,
+                                                           acl_group_combo_lookup: AclGroupComboLookup):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(201)
+
+        # We should find the combo, and it should be in the database, but no names should be attached. Since only one
+        # (invalid) name row is returned, as far as anyone is concerned this combo id isn't in the database.
+        assert acl_group_combo.id == 201
+        assert len(acl_group_combo.names) == 0
+        assert not acl_group_combo.in_db
+
+    def test_by_name_that_is_an_invalid_group_name(self, acl_group_combo_lookup: AclGroupComboLookup):
+        with pytest.raises(AclGroupNameNotInDatabase) as ex:
+            acl_group_combo_lookup.by_names(_bad_location_group_name)
+
+        assert ex.value.missing_name == _bad_location_group_name
+
+    def test_cannot_add_invalid_group_name_to_valid_group(self,
+                                                          acl_group_combo_lookup: AclGroupComboLookup):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(100)
+        assert acl_group_combo.in_db
+
+        with pytest.raises(AclGroupNameNotInDatabase) as ex:
+            acl_group_combo_lookup.by_names(_bad_location_group_name)
+
+    def test_by_names_that_make_an_invalid_group(self, acl_group_combo_lookup: AclGroupComboLookup):
+        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1, _tenant_2, _tenant_3)
+
+        # Combo ID 202 does exist, but shouldn't be selected because it's a different location group.
+        assert acl_group_combo.id == 0
+        assert acl_group_combo.names == frozenset({_tenant_1, _tenant_2, _tenant_3})
+        assert not acl_group_combo.in_db
+
 
 class TestAclGroupComboWrite:
     def test_writing_non_existent_acl_combo_to_db(self,
@@ -150,11 +191,11 @@ class TestAclGroupComboWrite:
         assert new_acl_group_combo.names == acl_group_combo.names
         assert new_acl_group_combo.in_db == acl_group_combo.in_db
 
-    def test_nothing_writes_if_in_db_already(self, acs_data_engine: Engine,
+    def test_nothing_writes_if_in_db_already(self,
+                                             acs_data_session: Session,
                                              acl_group_combo_lookup: AclGroupComboLookup,
                                              acs_updated_callback: Mock):
-        session = Session(acs_data_engine)
-        starting_rows = session.execute(select(AclGrpCombo)).all()
+        starting_rows = acs_data_session.execute(select(AclGrpCombo)).all()
 
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1)
         # We know this one is in the db, but we don't want to check it here to make sure our code checks it in write
@@ -163,16 +204,15 @@ class TestAclGroupComboWrite:
 
         acs_updated_callback.assert_not_called()
 
-        ending_rows = session.execute(select(AclGrpCombo)).all()
+        ending_rows = acs_data_session.execute(select(AclGrpCombo)).all()
 
         assert starting_rows == ending_rows
 
     def test_nothing_writes_if_empty(self,
-                                     acs_data_engine: Engine,
+                                     acs_data_session: Session,
                                      acl_group_combo_lookup: AclGroupComboLookup,
                                      acs_updated_callback: Mock):
-        session = Session(acs_data_engine)
-        starting_rows = session.execute(select(AclGrpCombo)).all()
+        starting_rows = acs_data_session.execute(select(AclGrpCombo)).all()
 
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.empty()
 
@@ -180,6 +220,28 @@ class TestAclGroupComboWrite:
 
         acs_updated_callback.assert_not_called()
 
-        ending_rows = session.execute(select(AclGrpCombo)).all()
+        ending_rows = acs_data_session.execute(select(AclGrpCombo)).all()
 
         assert starting_rows == ending_rows
+
+    def test_writing_names_that_made_an_invalid_group_creates_correct_group_names(self,
+                                                                                  acs_data_session: Session,
+                                                                                  acl_group_combo_lookup: AclGroupComboLookup,
+                                                                                  acs_updated_callback: Mock
+                                                                                  ):
+        starting_rows = acs_data_session.execute(select(AclGrpCombo)).all()
+
+        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1, _tenant_2, _tenant_3)
+
+        acl_group_combo.write()
+
+        assert acl_group_combo.id != 0  # Auto generated, but it needs to be something
+        assert acl_group_combo.names == frozenset({_tenant_1, _tenant_2, _tenant_3})
+        assert acl_group_combo.in_db
+
+        acs_updated_callback.assert_called_once_with(acl_group_combo)
+
+        ending_rows = acs_data_session.execute(select(AclGrpCombo)).all()
+
+        # Should have written 3 rows, 1 for each name in the correct group
+        assert len(starting_rows) + 3 == len(ending_rows)

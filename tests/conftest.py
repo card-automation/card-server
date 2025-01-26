@@ -160,6 +160,9 @@ def table_acl_group_name(session: Session):
         AclGrpName(ID=3, LocGrp=location_group_id, Name="Tenant 1"),
         AclGrpName(ID=4, LocGrp=location_group_id, Name="Tenant 2"),
         AclGrpName(ID=5, LocGrp=location_group_id, Name="Tenant 3"),
+
+        # Bad location groups
+        AclGrpName(ID=10, LocGrp=bad_location_group, Name="Bad Location Group Name")
     ])
 
 
@@ -189,6 +192,13 @@ def table_acl_group_combo(session: Session):
         AclGrpCombo(ID=108, AclGrpNameID=3, ComboID=108, LocGrp=location_group_id),  # 102: Tenant 1 Only
         AclGrpCombo(ID=109, AclGrpNameID=4, ComboID=109, LocGrp=location_group_id),  # 104: Tenant 2 Only
         AclGrpCombo(ID=110, AclGrpNameID=5, ComboID=110, LocGrp=location_group_id),  # 106: Tenant 3 Only
+
+        # Bad location groups
+        AclGrpCombo(ID=1000, AclGrpNameID=5, ComboID=200, LocGrp=bad_location_group),  # 200: Tenant 3 from a different location group
+        AclGrpCombo(ID=1001, AclGrpNameID=10, ComboID=201, LocGrp=location_group_id),  # 201: Points to bad group name
+        AclGrpCombo(ID=1002, AclGrpNameID=3, ComboID=202, LocGrp=bad_location_group),  # 202: Tenant 1
+        AclGrpCombo(ID=1003, AclGrpNameID=4, ComboID=202, LocGrp=bad_location_group),  # 202: Tenant 2
+        AclGrpCombo(ID=1004, AclGrpNameID=5, ComboID=202, LocGrp=bad_location_group),  # 202: Tenant 3
     ])
 
 

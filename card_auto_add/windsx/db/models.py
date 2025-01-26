@@ -190,7 +190,7 @@ class AclGrpName(AcsDataBase):
 class AclGrpCombo(AcsDataBase):
     __tablename__ = 'AclGrpCombo'
 
-    ID: Mapped[int] = mapped_column('ID', primary_key=True, nullable=True)
+    ID: Mapped[int] = mapped_column('ID', primary_key=True, nullable=False)
     AclGrpNameID: Mapped[int] = mapped_column('AclGrpNameID', ForeignKey('AclGrpName.ID'), default=0)
     ComboID: Mapped[int] = mapped_column('ComboID', default=0)
     LocGrp: Mapped[int] = mapped_column('LocGrp', nullable=True, default=0)
