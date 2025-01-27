@@ -5,7 +5,7 @@ from sqlalchemy import select, distinct
 from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.models import AclGrpCombo, AclGrpName
-from card_auto_add.windsx.lookup.utils import LookupInfo, guard_db_populated, DbModel
+from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel
 
 StringOrFrozenSet = Union[str, frozenset[str], Iterable[str]]
 
@@ -60,25 +60,22 @@ class AclGroupComboSet(DbModel):
                  lookup_info: LookupInfo,
                  combo_id: int
                  ):
-        super().__init__()
         self._lookup_info: LookupInfo = lookup_info
         self._location_group_id: int = self._lookup_info.location_group_id
         self._session = Session(self._lookup_info.acs_engine)
         self._combo_id = combo_id
         self._names: Optional[frozenset[[str]]] = None
-        self._in_db: Optional[bool] = None
+        super().__init__()
 
     @property
     def id(self) -> int:
         return self._combo_id
 
     @property
-    @guard_db_populated
     def names(self) -> frozenset[str]:
         return self._names
 
     @property
-    @guard_db_populated
     def in_db(self) -> bool:
         return self._in_db
 

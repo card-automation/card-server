@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from card_auto_add.windsx.db.models import CARDS
 from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboSet
 from card_auto_add.windsx.lookup.person import Person
-from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel, guard_db_populated
+from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel
 
 
 class AccessCardLookup:
@@ -47,7 +47,6 @@ class AccessCard(DbModel):
                  lookup_info: LookupInfo,
                  card_id: int
                  ):
-        super().__init__()
         self._lookup_info: LookupInfo = lookup_info
         self._location_group_id: int = self._lookup_info.location_group_id
         self._session = Session(self._lookup_info.acs_engine)
@@ -56,13 +55,13 @@ class AccessCard(DbModel):
         self._name_id: Optional[int] = None
         self._active: Optional[bool] = None
         self._acl_group_combo: AclGroupComboSet = AclGroupComboSet(self._lookup_info, 0)
+        super().__init__()
 
     @property
     def id(self) -> int:
         return self._card_id
 
     @property
-    @guard_db_populated
     def card_number(self) -> int:
         return self._card_number
 
@@ -71,12 +70,10 @@ class AccessCard(DbModel):
         self._card_number = value
 
     @property
-    @guard_db_populated
     def active(self) -> bool:
         return self._active
 
     @property
-    @guard_db_populated
     def person(self) -> Person:
         return Person(self._lookup_info, self._name_id)
 

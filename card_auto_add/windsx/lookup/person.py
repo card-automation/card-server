@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.models import NAMES, UDF, UdfName, CARDS, UdfSel
-from card_auto_add.windsx.lookup.utils import DbModel, guard_db_populated, LookupInfo
+from card_auto_add.windsx.lookup.utils import DbModel, LookupInfo
 
 
 class InvalidUdfName(Exception):
@@ -170,7 +170,6 @@ class Person(DbModel):
     def __init__(self,
                  lookup_info: LookupInfo,
                  name_id: int):
-        super().__init__()
         self._lookup_info: LookupInfo = lookup_info
         self._location_group_id: int = self._lookup_info.location_group_id
         self._session = Session(lookup_info.acs_engine)
@@ -179,43 +178,37 @@ class Person(DbModel):
         self._last_name: Optional[str] = None
         self._company_id: Optional[int] = None
         self._user_defined_fields: Optional[dict[str, str]] = None
+        super().__init__()
 
     @property
     def id(self) -> int:
         return self._name_id
 
     @property
-    @guard_db_populated
     def first_name(self) -> Optional[str]:
         return self._first_name
 
     @first_name.setter
-    @guard_db_populated
     def first_name(self, value: str):
         self._first_name = value
 
     @property
-    @guard_db_populated
     def last_name(self) -> Optional[str]:
         return self._last_name
 
     @last_name.setter
-    @guard_db_populated
     def last_name(self, value: str):
         self._last_name = value
 
     @property
-    @guard_db_populated
     def company_id(self) -> Optional[int]:
         return self._company_id
 
     @company_id.setter
-    @guard_db_populated
     def company_id(self, value: int):
         self._company_id = value
 
     @property
-    @guard_db_populated
     def user_defined_fields(self) -> Optional[dict[str, str]]:
         return self._user_defined_fields
 
