@@ -252,7 +252,7 @@ class CARDS(AcsDataBase):
     __tablename__ = 'CARDS'
 
     ID: Mapped[int] = mapped_column('ID', nullable=True)
-    NameID: Mapped[int] = mapped_column('NameID')
+    NameID: Mapped[int] = mapped_column('NameID', ForeignKey('NAMES.ID'))
     LocGrp: Mapped[int] = mapped_column('LocGrp', ForeignKey('LocGrp.LocGrp'), primary_key=True)
     Code: Mapped[float] = mapped_column('Code', primary_key=True, default=1.0)
     Pin: Mapped[int] = mapped_column('Pin', nullable=True, default=0)

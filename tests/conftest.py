@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Callable, Any
 from unittest.mock import Mock
 
@@ -7,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.engine_factory import EngineFactory
 from card_auto_add.windsx.db.models import *
+from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard
 from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
 from card_auto_add.windsx.lookup.person import PersonLookup
 from card_auto_add.windsx.lookup.utils import LookupInfo
@@ -194,7 +196,8 @@ def table_acl_group_combo(session: Session):
         AclGrpCombo(ID=110, AclGrpNameID=5, ComboID=110, LocGrp=location_group_id),  # 106: Tenant 3 Only
 
         # Bad location groups
-        AclGrpCombo(ID=1000, AclGrpNameID=5, ComboID=200, LocGrp=bad_location_group),  # 200: Tenant 3 from a different location group
+        AclGrpCombo(ID=1000, AclGrpNameID=5, ComboID=200, LocGrp=bad_location_group),
+        # 200: Tenant 3 from a different location group
         AclGrpCombo(ID=1001, AclGrpNameID=10, ComboID=201, LocGrp=location_group_id),  # 201: Points to bad group name
         AclGrpCombo(ID=1002, AclGrpNameID=3, ComboID=202, LocGrp=bad_location_group),  # 202: Tenant 1
         AclGrpCombo(ID=1003, AclGrpNameID=4, ComboID=202, LocGrp=bad_location_group),  # 202: Tenant 2
@@ -224,9 +227,10 @@ def table_names(session: Session):
         NAMES(ID=201, LocGrp=location_group_id, FName="Ray", LName="Securitay", Company=2),
         NAMES(ID=301, LocGrp=location_group_id, FName="Best", LName="Employee", Company=3),
         NAMES(ID=302, LocGrp=location_group_id, FName="Worst", LName="Employee", Company=3),
-        NAMES(ID=401, LocGrp=location_group_id, FName="Best", LName="Employee", Company=4),
         # Same name, different company
+        NAMES(ID=401, LocGrp=location_group_id, FName="Best", LName="Employee", Company=4),
         NAMES(ID=402, LocGrp=location_group_id, FName="ToBe", LName="Fired", Company=4),
+        NAMES(ID=403, LocGrp=location_group_id, FName="ToBe", LName="Hired", Company=4),
         # Tenant 3 intentionally has no employees listed here so we can insert them in the unit test and just assert on
         # count by company
 
@@ -274,12 +278,35 @@ def table_udf(session: Session):
 
 
 def table_cards(session: Session):
+    active_card = {
+        'Status': True,
+        'StartDate': datetime(year=2000, month=1, day=1),
+        'StopDate': AccessCard.active_stop_date,
+    }
+    inactive_card = {
+        'Status': False,
+        'StartDate': datetime(year=2000, month=1, day=1),
+        'StopDate': datetime.today(),
+    }
+
     session.add_all([
         # BobThe BuildingManager with master access level
-        CARDS(LocGrp=location_group_id, NameID=101, Code=3000, AclGrpComboID=101),
+        CARDS(ID=1, LocGrp=location_group_id, NameID=101, Code=3000, AclGrpComboID=100, **active_card),
+        # Fire Key with master access level
+        CARDS(ID=2, LocGrp=location_group_id, NameID=110, Code=200, AclGrpComboID=100, **active_card),
+        # ToBe Fired with Tenant 2 and Main Building access level
+        CARDS(ID=3, LocGrp=location_group_id, NameID=402, Code=2000, AclGrpComboID=104, **active_card),
+        # Best Employ with Main Building access level (They need tenant 1 access level)
+        CARDS(ID=4, LocGrp=location_group_id, NameID=401, Code=2001, AclGrpComboID=101, **active_card),
+        # ToBe Hired with no access level
+        CARDS(ID=5, LocGrp=location_group_id, NameID=403, Code=2002, AclGrpComboID=0, **inactive_card),
 
         # name ids [101, 102] are returned UNLESS we correctly filter on the location group for the card lookup
-        CARDS(LocGrp=bad_location_group, NameID=102, Code=3000, AclGrpComboID=101),
+        CARDS(ID=1001, LocGrp=bad_location_group, NameID=102, Code=3000, AclGrpComboID=100, **active_card),
+        CARDS(ID=1002, LocGrp=bad_location_group, NameID=102, Code=3001, AclGrpComboID=100, **active_card),
+
+        # Missing codes:
+        # 10000: Used for lookup where card number isn't present
     ])
 
 
@@ -344,3 +371,8 @@ def person_lookup(lookup_info: LookupInfo) -> PersonLookup:
 @pytest.fixture
 def acl_group_combo_lookup(lookup_info: LookupInfo) -> AclGroupComboLookup:
     return AclGroupComboLookup(lookup_info)
+
+
+@pytest.fixture
+def access_card_lookup(lookup_info: LookupInfo) -> AccessCardLookup:
+    return AccessCardLookup(lookup_info)
