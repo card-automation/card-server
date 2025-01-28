@@ -380,9 +380,6 @@ def table_location_cards(session: Session):
         LocCards(ID=900, CardID=5, Loc=main_location_id, Acl=11),
     ])
 
-
-# TODO Table LocCards (Needs CARDS, ACL)
-
 # TODO OLL
 # TODO Table IO
 # TODO OllName

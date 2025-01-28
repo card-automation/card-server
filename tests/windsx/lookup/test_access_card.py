@@ -460,8 +460,80 @@ class TestAccessCardWrite:
 
         assert ab_match or ba_match
 
+    def test_removing_card_access_sets_loc_cards_row_for_deletion(self,
+                                                                  acs_data_session: Session,
+                                                                  db_helper: DbHelper,
+                                                                  access_card_lookup: AccessCardLookup):
+        assert db_helper.loc_cards(5, main_location_id, 11) is not None
+        starting_rows = acs_data_session.scalars(select(LocCards)).all()
+
+        access_card: AccessCard = access_card_lookup.by_card_number(2002)
+
+        access_card \
+            .without_access(*access_card.access) \
+            .write()
+
+        assert not access_card.active
+
+        ending_rows = acs_data_session.scalars(select(LocCards)).all()
+        assert len(starting_rows) == len(ending_rows)
+
+        # Acl -1 because the card is set for deactivation
+        loc_cards = db_helper.loc_cards(5, main_location_id, -1)
+        assert loc_cards is not None
+        # When de-activating a card, we only signal that the LocCards row will be deleted. We don't do it ourselves.
+        assert loc_cards.DlFlag == 2
+        assert loc_cards.Acl == -1
+        assert loc_cards.Acl1 == -1
+        assert loc_cards.Acl2 == -1
+        assert loc_cards.Acl3 == -1
+        assert loc_cards.Acl4 == -1
+
+    def test_giving_master_access_level_sets_acl_to_zero(self,
+                                                         acs_data_session: Session,
+                                                         db_helper: DbHelper,
+                                                         access_card_lookup: AccessCardLookup):
+        starting_dgrp_rows = acs_data_session.scalars(select(DGRP)).all()
+        starting_acl_rows = acs_data_session.scalars(select(ACL)).all()
+        starting_loc_cards_rows = acs_data_session.scalars(select(LocCards)).all()
+
+        assert db_helper.loc_cards(6, main_location_id, 0) is None
+        assert db_helper.loc_cards(6, annex_location_id, 0) is None
+
+        access_card: AccessCard = access_card_lookup.by_card_number(2003)
+        access_card \
+            .with_access(_acl_name_master_access_level) \
+            .write()
+
+        ending_dgrp_rows = acs_data_session.scalars(select(DGRP)).all()
+        assert len(starting_dgrp_rows) == len(ending_dgrp_rows)
+        ending_acl_rows = acs_data_session.scalars(select(ACL)).all()
+        assert len(starting_acl_rows) == len(ending_acl_rows)
+        ending_loc_cards_rows = acs_data_session.scalars(select(LocCards)).all()
+        assert len(starting_loc_cards_rows) + 2 == len(ending_loc_cards_rows)
+
+        # These are the extra 2 rows
+        main_loc_cards = db_helper.loc_cards(6, main_location_id, 0)
+        assert main_loc_cards is not None
+        assert main_loc_cards.DlFlag == 1
+        assert main_loc_cards.CkSum == 0
+        assert main_loc_cards.Acl == 0  # Master access level
+        assert main_loc_cards.Acl1 == -1
+        assert main_loc_cards.Acl2 == -1
+        assert main_loc_cards.Acl3 == -1
+        assert main_loc_cards.Acl4 == -1
+
+        annex_loc_cards = db_helper.loc_cards(6, annex_location_id, 0)
+        assert annex_loc_cards is not None
+        assert annex_loc_cards.DlFlag == 1
+        assert annex_loc_cards.CkSum == 0
+        assert annex_loc_cards.Acl == 0  # Master access level
+        assert annex_loc_cards.Acl1 == -1
+        assert annex_loc_cards.Acl2 == -1
+        assert annex_loc_cards.Acl3 == -1
+        assert annex_loc_cards.Acl4 == -1
+
     def test_writing_card_updates_location_table_to_download(self,
-                                                             acs_data_session: Session,
                                                              db_helper: DbHelper,
                                                              access_card_lookup: AccessCardLookup):
         # This is the same setup as test_writing_card_creates_needed_loc_cards_entries
@@ -535,7 +607,3 @@ class TestAccessCardWrite:
 
         with pytest.raises(InvalidPersonForAccessCard):
             access_card.write()
-
-# TODO
-# - Test master access level
-# - Test losing all access and how it affects various tables

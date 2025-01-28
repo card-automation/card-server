@@ -137,6 +137,10 @@ class AclGroupComboSet(DbModel):
         return id_to_names
 
     def _name_ids_by_name(self, names: Collection[str]) -> Dict[str, int]:
+        if len(names) == 0:
+            # Our tests would handle the below SQL statement just fine, but Microsoft Access is less happy with it.
+            return {}
+
         acl_group_name_rows = self._session.execute(
             select(AclGrpName.ID, AclGrpName.Name)
             .where(AclGrpName.Name.in_(names))

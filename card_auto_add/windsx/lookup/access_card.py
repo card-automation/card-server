@@ -201,8 +201,27 @@ class _AccessControlListUpdater:
 
         self._location_ids_to_update: set[int] = set()
 
-        self._acl_group_name_ids: list[int] = self.__get_acl_group_name_ids()
+        # TODO if acl group name ids length is 0, we should just delete any LocCards entry and call it a day
+
         self._locations: list[int] = self.__get_locations()
+        self._acl_group_name_ids: list[int] = self.__get_acl_group_name_ids()
+
+        if len(self._acl_group_name_ids) == 0:
+            self._deactivate_loc_cards()
+            self.__update_locations()
+            return
+
+        update_to_master = any(self._session.scalars(
+            select(AclGrpName.IsMaster)
+            .where(AclGrpName.LocGrp == self._location_group_id)
+            .where(AclGrpName.ID.in_(self._acl_group_name_ids))
+        ).all())
+
+        if update_to_master:
+            self.__update_loc_cards_to_master()
+            self.__update_locations()
+            return
+
         self._acl_groups: list[AclGrp] = self.__get_acl_groups()
         # The next two dictionaries are {location_id -> {timezone -> X}}
         self._acl_groups_grouped: dict[int, dict[int, list[AclGrp]]] = self.__get_acl_groups_grouped()
@@ -210,6 +229,7 @@ class _AccessControlListUpdater:
         # This one is {location_id -> [ACL]}
         self._acls: dict[int, list[ACL]] = self.__get_acls()
         self._loc_cards: list[LocCards] = self.__get_loc_cards()
+
         self.__update_locations()
 
     def __get_acl_group_name_ids(self) -> list[int]:
@@ -389,4 +409,53 @@ class _AccessControlListUpdater:
             location.CodeCs = 0
             self._session.add(location)
 
+            self._session.commit()
+
+    def _deactivate_loc_cards(self):
+        for location_id in self._locations:
+            loc_cards = self._session.scalar(
+                select(LocCards)
+                .where(LocCards.CardID == self._card_id)
+                .where(LocCards.Loc == location_id)
+            )
+
+            if loc_cards is None:
+                continue
+
+            loc_cards.DlFlag = 2  # The CommServer will delete this row
+            loc_cards.Acl = -1
+            loc_cards.Acl1 = -1
+            loc_cards.Acl2 = -1
+            loc_cards.Acl3 = -1
+            loc_cards.Acl4 = -1
+
+            self._location_ids_to_update.add(location_id)
+
+            self._session.add(loc_cards)
+            self._session.commit()
+
+    def __update_loc_cards_to_master(self):
+        for location_id in self._locations:
+            loc_cards = self._session.scalar(
+                select(LocCards)
+                .where(LocCards.CardID == self._card_id)
+                .where(LocCards.Loc == location_id)
+            )
+
+            if loc_cards is None:
+                loc_cards = LocCards(
+                    Loc=location_id,
+                    CardID=self._card_id,
+                )
+
+            loc_cards.DlFlag = 1
+            loc_cards.Acl = 0  # This is what sets the Acl to master
+            loc_cards.Acl1 = -1
+            loc_cards.Acl2 = -1
+            loc_cards.Acl3 = -1
+            loc_cards.Acl4 = -1
+
+            self._location_ids_to_update.add(location_id)
+
+            self._session.add(loc_cards)
             self._session.commit()
