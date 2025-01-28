@@ -1,32 +1,70 @@
 from datetime import datetime, date
-from typing import Optional
+from typing import Optional, Sequence, Union
 from unittest.mock import Mock
 
 import pytest
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, InstrumentedAttribute, Mapped
 
-from card_auto_add.windsx.db.models import CARDS
+from card_auto_add.windsx.db.models import CARDS, DGRP, ACL, LocCards, LOC
 from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard
 from card_auto_add.windsx.lookup.person import Person, PersonLookup
 from card_auto_add.windsx.lookup.utils import LookupInfo
+from tests.conftest import main_location_id, annex_location_id
 
 _acl_name_master_access_level = "Master Access Level"
 _acl_name_main_building_access = "Main Building Access"
 _acl_name_tenant_1_access = "Tenant 1"
 _acl_name_tenant_2_access = "Tenant 2"
+_acl_name_tenant_3_access = "Tenant 3"
 
 
 class DbHelper:
     def __init__(self, lookup_info: LookupInfo):
         self._lookup_info = lookup_info
-        self._session = Session(lookup_info.acs_engine)
+
+    @property
+    def _session(self) -> Session:
+        # Using a property and a new session means we avoid caching issues in the test
+        return Session(self._lookup_info.acs_engine)
 
     def card_by_id(self, card_id: int) -> Optional[CARDS]:
         return self._session.scalar(
             select(CARDS)
             .where(CARDS.ID == card_id)
             .where(CARDS.LocGrp == self._lookup_info.location_group_id)
+        )
+
+    def device_group_by_devices(self, location_id: int, *attributes: InstrumentedAttribute) -> Sequence[DGRP]:
+        query = select(DGRP).where(DGRP.Loc == location_id)
+
+        for i in range(128):
+            device_attr: InstrumentedAttribute = getattr(DGRP, f"D{i}")
+            query = query.where(device_attr == (device_attr in attributes))
+
+        return self._session.scalars(query).all()
+
+    def acl(self, location_id: int, dgrp: int, timezone: int) -> Optional[ACL]:
+        return self._session.scalar(
+            select(ACL)
+            .where(ACL.Loc == location_id)
+            .where(ACL.Tz == timezone)
+            .where(ACL.DGrp == dgrp)
+        )
+
+    def loc_cards(self, card_id: int, location_id: int, acl: Union[int, Mapped[int]]) -> Optional[LocCards]:
+        return self._session.scalar(
+            select(LocCards)
+            .where(LocCards.CardID == card_id)
+            .where(LocCards.Loc == location_id)
+            .where(LocCards.Acl == acl)
+        )
+
+    def loc(self, location_id: int) -> Optional[LOC]:
+        return self._session.scalar(
+            select(LOC)
+            .where(LOC.LocGrp == self._lookup_info.location_group_id)
+            .where(LOC.Loc == location_id)
         )
 
 
@@ -279,9 +317,9 @@ class TestAccessCardWrite:
         assert access_card.person.id == 403
 
     def test_can_update_person_by_id(self,
-                               acs_updated_callback: Mock,
-                               access_card_lookup: AccessCardLookup,
-                               person_lookup: PersonLookup):
+                                     acs_updated_callback: Mock,
+                                     access_card_lookup: AccessCardLookup,
+                                     person_lookup: PersonLookup):
         access_card: AccessCard = access_card_lookup.by_card_number(2000)  # ToBe Fired
 
         assert access_card.in_db
@@ -299,18 +337,161 @@ class TestAccessCardWrite:
         assert access_card.in_db
         assert access_card.person.id == 403
 
+    def test_writing_card_creates_needed_device_groups(self,
+                                                       db_helper: DbHelper,
+                                                       access_card_lookup: AccessCardLookup):
+        # Device groups:
+        # Main location, door 0 - In db
+        # Main location, door 2 - NOT in db
+        # Annex location, door 1 - NOT in db
+        device_groups = db_helper.device_group_by_devices(main_location_id, DGRP.D0)
+        assert len(device_groups) == 1
+        device_group: DGRP = device_groups[0]
+        assert device_group.ID == 5001
+        assert device_group.DGrp == 1
+        device_groups = db_helper.device_group_by_devices(main_location_id, DGRP.D2)
+        assert len(device_groups) == 0
+        device_groups = db_helper.device_group_by_devices(annex_location_id, DGRP.D1)
+        assert len(device_groups) == 0
+
+        access_card: AccessCard = access_card_lookup.by_card_number(2002)
+
+        access_card \
+            .with_access(_acl_name_tenant_2_access) \
+            .write()
+
+        # Now we should have a new DGRP with those doors in each location
+        device_groups = db_helper.device_group_by_devices(main_location_id, DGRP.D0)
+        assert len(device_groups) == 1
+        device_group: DGRP = device_groups[0]
+        assert device_group.ID == 5001
+        assert device_group.DGrp == 1
+        assert device_group.DlFlag == 0  # We didn't set it to download
+
+        device_groups = db_helper.device_group_by_devices(main_location_id, DGRP.D2)
+        assert len(device_groups) == 1
+        device_group: DGRP = device_groups[0]
+        assert device_group.DlFlag == 1
+        assert device_group.CkSum == 0
+
+        device_groups = db_helper.device_group_by_devices(annex_location_id, DGRP.D1)
+        assert len(device_groups) == 1
+        device_group: DGRP = device_groups[0]
+        assert device_group.DlFlag == 1
+        assert device_group.CkSum == 0
+
+    def test_writing_card_creates_needed_acl_entries(self,
+                                                     db_helper: DbHelper,
+                                                     access_card_lookup: AccessCardLookup):
+        assert db_helper.acl(main_location_id, 3, 1) is not None
+        assert db_helper.acl(annex_location_id, 4, 1) is None
+        assert db_helper.acl(annex_location_id, 5, 3) is None
+
+        access_card: AccessCard = access_card_lookup.by_card_number(2002)
+
+        access_card \
+            .with_access(_acl_name_tenant_3_access) \
+            .write()
+
+        acl = db_helper.acl(main_location_id, 3, 1)
+        assert acl is not None
+        assert acl.DlFlag == 0  # Already existed, so we shouldn't set it to download
+
+        acl = db_helper.acl(annex_location_id, 4, 1)
+        assert acl is not None
+        assert acl.Acl != 0  # Should just be incremented, but as long as it's not 0 as that becomes master access level
+        assert acl.DlFlag == 1
+        assert acl.CkSum == 0
+
+        acl = db_helper.acl(annex_location_id, 5, 3)
+        assert acl is not None
+        assert acl.Acl != 0
+        assert acl.DlFlag == 1
+        assert acl.CkSum == 0
+
+    def test_writing_card_creates_needed_loc_cards_entries(self,
+                                                           acs_data_session: Session,
+                                                           db_helper: DbHelper,
+                                                           access_card_lookup: AccessCardLookup):
+        assert db_helper.loc_cards(5, main_location_id, 11) is not None
+        starting_rows = acs_data_session.scalars(select(LocCards)).all()
+
+        access_card: AccessCard = access_card_lookup.by_card_number(2002)
+
+        access_card \
+            .with_access(_acl_name_tenant_3_access) \
+            .write()
+
+        ending_rows = acs_data_session.scalars(select(LocCards)).all()
+        assert len(starting_rows) + 1 == len(ending_rows)
+
+        loc_cards = db_helper.loc_cards(5, main_location_id, 11)
+        assert loc_cards is not None
+        assert loc_cards.DlFlag == 0
+
+        new_loc_cards = None
+        for ending_row in ending_rows:
+            if any(x.ID == ending_row.ID for x in starting_rows):
+                continue
+            new_loc_cards = ending_row
+            break
+
+        assert new_loc_cards is not None
+        assert new_loc_cards.DlFlag == 1
+        assert new_loc_cards.CkSum == 0
+
+        acl_a = db_helper.acl(annex_location_id, 4, 1)
+        assert acl_a is not None  # Previous test should verify more details
+        acl_b = db_helper.acl(annex_location_id, 5, 3)
+        assert acl_b is not None  # Previous test should verify more details
+
+        # We don't know what order these will be in, but either is valid
+        ab_match = new_loc_cards.Acl == acl_a.Acl \
+                   and new_loc_cards.Acl1 == acl_b.Acl \
+                   and new_loc_cards.Acl2 == -1 \
+                   and new_loc_cards.Acl3 == -1 \
+                   and new_loc_cards.Acl4 == -1
+
+        ba_match = new_loc_cards.Acl == acl_b.Acl \
+                   and new_loc_cards.Acl1 == acl_a.Acl \
+                   and new_loc_cards.Acl2 == -1 \
+                   and new_loc_cards.Acl3 == -1 \
+                   and new_loc_cards.Acl4 == -1
+
+        assert ab_match or ba_match
+
+    def test_writing_card_updates_location_table_to_download(self,
+                                                             acs_data_session: Session,
+                                                             db_helper: DbHelper,
+                                                             access_card_lookup: AccessCardLookup):
+        # This is the same setup as test_writing_card_creates_needed_loc_cards_entries
+        # We expect the main location not to need an update, because every step of the way the main building has had its
+        # DGRP, ACL, LocCards entries all pre-populated. The only side that got changed was the annex.
+
+        main_building = db_helper.loc(main_location_id)
+        assert main_building is not None
+        assert not main_building.PlFlag
+
+        annex = db_helper.loc(annex_location_id)
+        assert annex is not None
+        assert not annex.PlFlag
+
+        access_card: AccessCard = access_card_lookup.by_card_number(2002)
+
+        access_card \
+            .with_access(_acl_name_tenant_3_access) \
+            .write()
+
+        main_building = db_helper.loc(main_location_id)
+        assert not main_building.PlFlag  # Still no updates for you
+        annex = db_helper.loc(annex_location_id)
+        assert annex.PlFlag
+        assert annex.TzCs == 0
+        assert annex.AclCs == 0
+        assert annex.DGrpCs == 0
+        assert annex.CodeCs == 0
 
 # TODO
-# - I'm thinking we should get rid of guard_db_populated and just always call _populate_from_db in our __init__ method from the parent.
-# - Does writing an access card write the person or vice-versa? I think no.
-# - TODO figure out the flow of adding a card to a person or vice-versa to make sure everything saves properly.
-# - We'll need to essentially test every other table that gets updated in activations.py
-# - CARDS  (AclGrpComboID, StartDate, StopDate, Status)
-# - LocCards (DlFlag, CkSum, Acl, Acl1, Acl2, Acl3, Acl4. One row per location, looks like.)
-# - AclGrpCombo (Not updated, but AclGrp is fetched with it)
-# - AclGrp (For a given group name, what doors do you get access to with what time zone. We don't ever need to update this)
-# - LOC (PlFlag, DlFlag, FullDlFlag, NodeCs, CodeCs, AclCs, DGrpCs all get updated. I'm noticing that really we only need to update PlFlag and ignore DlFlag and FullDlFlag. See scratch_26.py)
-# - DGRP (Lookup or create new one. For a given location, what doors do you have access to. New one sets DlFlag to 1 and CkSum to 0)
-# - ACL (For a specific DGRP and timezone, this gives the ACL that gets updated in LocCards.)
-# Basically, what we have in activations.py is close but butchers all the location/location group stuff.
-# - Test our updated callback. Really, since we have the card id, whatever handles this can just wait for all the LocCards to be downloaded. We shouldn't have to care about location, but if we have a plugin per location group, then it'll be useful to use the location of the location card to find which location group to send it to.
+# - Test brand new card
+# - Test master access level
+# - Test losing all access and how it affects various tables

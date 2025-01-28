@@ -1,5 +1,3 @@
-from datetime import timedelta
-from typing import Callable, Any
 from unittest.mock import Mock
 
 import pytest
@@ -90,7 +88,7 @@ def table_location(session: Session):
 
 def table_timezone(session: Session):
     session.add_all([
-        TZ(ID=-659436830,
+        TZ(ID=1001,
            Loc=main_location_id,
            TZ=1,
            Name="Always(24x7)",
@@ -116,7 +114,7 @@ def table_timezone(session: Session):
            Hol3Start=0,
            Hol3Stop=2400,
            DlFlag=0),
-        TZ(ID=-1576553029,
+        TZ(ID=1002,
            Loc=main_location_id,
            TZ=2,
            Name="Front Door Auto Unlock",
@@ -142,6 +140,32 @@ def table_timezone(session: Session):
            Hol3Start=0,
            Hol3Stop=2400,
            DlFlag=0),
+        TZ(ID=1002,
+           Loc=main_location_id,
+           TZ=3,
+           Name="Work hours only",
+           LinkStatus=1,
+           SunStart=0,
+           SunStop=0,
+           MonStart=800,
+           MonStop=1800,
+           TueStart=800,
+           TueStop=1800,
+           WedStart=800,
+           WedStop=1800,
+           ThuStart=800,
+           ThuStop=1800,
+           FriStart=800,
+           FriStop=1800,
+           SatStart=0,
+           SatStop=0,
+           Hol1Start=0,
+           Hol1Stop=0,
+           Hol2Start=0,
+           Hol2Stop=0,
+           Hol3Start=0,
+           Hol3Stop=0,
+           DlFlag=0),
     ])
 
 
@@ -152,12 +176,19 @@ def table_devices(session: Session):
         DEV(ID=2, Loc=main_location_id, Device=2, Name='Tenant 2 Door'),
         DEV(ID=3, Loc=main_location_id, Device=3, Name='Tenant 3 Door A'),
         DEV(ID=4, Loc=main_location_id, Device=4, Name='Tenant 3 Door B'),
+        DEV(ID=5, Loc=annex_location_id, Device=0, Name='Tenant 3 Annex Door'),
+        DEV(ID=6, Loc=annex_location_id, Device=1, Name='Tenant 2 Annex Door'),
+        DEV(ID=7, Loc=annex_location_id, Device=2, Name='Tenant 3 Secret Lab Door'),
+
+        # Bad Location
+        DEV(ID=10, Loc=bad_main_location_id, Device=0, Name='Tenant 3 Different Location'),
     ])
 
 
 def table_acl_group_name(session: Session):
     session.add_all([
-        AclGrpName(ID=1, LocGrp=location_group_id, Name="Master Access Level"),
+        # TODO Test how the IsMaster flag actually works. For LocCards, looks like it gets an Acl of 0.
+        AclGrpName(ID=1, LocGrp=location_group_id, Name="Master Access Level", IsMaster=True),
         AclGrpName(ID=2, LocGrp=location_group_id, Name="Main Building Access"),
         AclGrpName(ID=3, LocGrp=location_group_id, Name="Tenant 1"),
         AclGrpName(ID=4, LocGrp=location_group_id, Name="Tenant 2"),
@@ -175,9 +206,13 @@ def table_acl_group(session: Session):
         AclGrp(ID=3, AclGrpNameID=4, Loc=main_location_id, Dev=0, Tz1=1),  # Tenant 2 Access to Main Door
         AclGrp(ID=4, AclGrpNameID=5, Loc=main_location_id, Dev=0, Tz1=1),  # Tenant 3 Access to Main Door
         AclGrp(ID=5, AclGrpNameID=3, Loc=main_location_id, Dev=1, Tz1=1),  # Tenant 1 Access to Tenant 1 Door
-        AclGrp(ID=6, AclGrpNameID=4, Loc=main_location_id, Dev=2, Tz1=1),  # Tenant 2 Access to Tenant 2 Door
+        AclGrp(ID=6, AclGrpNameID=4, Loc=main_location_id, Dev=2, Tz1=3),  # Tenant 2 Access to Tenant 2 Door
         AclGrp(ID=7, AclGrpNameID=5, Loc=main_location_id, Dev=3, Tz1=1),  # Tenant 3 Access to Tenant 3 Door A
         AclGrp(ID=8, AclGrpNameID=5, Loc=main_location_id, Dev=4, Tz1=1),  # Tenant 3 Access to Tenant 3 Door B
+        AclGrp(ID=9, AclGrpNameID=5, Loc=annex_location_id, Dev=0, Tz1=1),  # Tenant 3 Access to Tenant 3 Annex Door
+        AclGrp(ID=10, AclGrpNameID=4, Loc=annex_location_id, Dev=1, Tz1=1),  # Tenant 2 Access to Tenant 2 Annex Door
+        AclGrp(ID=9, AclGrpNameID=5, Loc=annex_location_id, Dev=2, Tz1=3),  # Tenant 3 Access to Tenant 3 Secret Lab Door
+        # TODO bad main location
     ])
 
 
@@ -227,6 +262,7 @@ def table_names(session: Session):
         NAMES(ID=201, LocGrp=location_group_id, FName="Ray", LName="Securitay", Company=2),
         NAMES(ID=301, LocGrp=location_group_id, FName="Best", LName="Employee", Company=3),
         NAMES(ID=302, LocGrp=location_group_id, FName="Worst", LName="Employee", Company=3),
+        NAMES(ID=303, LocGrp=location_group_id, FName="Sys", LName="Admin", Company=3),
         # Same name, different company
         NAMES(ID=401, LocGrp=location_group_id, FName="Best", LName="Employee", Company=4),
         NAMES(ID=402, LocGrp=location_group_id, FName="ToBe", LName="Fired", Company=4),
@@ -300,6 +336,8 @@ def table_cards(session: Session):
         CARDS(ID=4, LocGrp=location_group_id, NameID=401, Code=2001, AclGrpComboID=101, **active_card),
         # ToBe Hired with no access level
         CARDS(ID=5, LocGrp=location_group_id, NameID=403, Code=2002, AclGrpComboID=0, **inactive_card),
+        # Sys Admin with no access level
+        CARDS(ID=6, LocGrp=location_group_id, NameID=303, Code=2003, AclGrpComboID=9, **inactive_card),
 
         # name ids [101, 102] are returned UNLESS we correctly filter on the location group for the card lookup
         CARDS(ID=1001, LocGrp=bad_location_group, NameID=102, Code=3000, AclGrpComboID=100, **active_card),
@@ -309,9 +347,38 @@ def table_cards(session: Session):
         # 10000: Used for lookup where card number isn't present
     ])
 
+def table_device_group(session: Session):
+    session.add_all([
+        # Main Building
+        DGRP(ID=5001, Loc=main_location_id, DGrp=1, D0=True),
+        # Main Building + Tenant 1
+        DGRP(ID=5002, Loc=main_location_id, DGrp=2, D0=True, D1=True),
+        # Tenant 2 has all of their DGRP entries created in the tests
+        # Tenant 3 Access to main location doors
+        DGRP(ID=5003, Loc=main_location_id, DGrp=3, D0=True, D3=True, D4=True),
+        # Tenant 3 Access to Tenant 3 Annex Door
+        DGRP(ID=5004, Loc=annex_location_id, DGrp=4, D0=True),
+        # Tenant 3 Access to Tenant 3 Secret Lab Door
+        DGRP(ID=5005, Loc=annex_location_id, DGrp=5, D2=True),
+    ])
 
-# TODO Table DGRP
-# TODO Table ACL (Needs DGRP)
+def table_access_control_list(session: Session):
+    session.add_all([
+        # Tenant 1 main building access timezone 1
+        ACL(ID=800, Loc=main_location_id, Acl=10, DGrp=2, Tz=1),
+        # Tenant 2 has all there DGRP entries created in tests, which the ACL would rely on
+        # Tenant 3 main building access timezone 1
+        ACL(ID=801, Loc=main_location_id, Acl=11, DGrp=3, Tz=1),
+        # Tenant 3 annex access timezone 1 is created in the tests
+        # Tenant 3 annex secret lab access timezone 3 is created in the tests
+    ])
+
+def table_location_cards(session: Session):
+    session.add_all([
+        LocCards(ID=900, CardID=5, Loc=main_location_id, Acl=11),
+    ])
+
+
 # TODO Table LocCards (Needs CARDS, ACL)
 
 # TODO OLL
@@ -329,6 +396,7 @@ def acs_data_engine() -> Engine:
     table_location(session)
     table_timezone(session)
     table_devices(session)
+    table_acl_group(session)
     table_acl_group_name(session)
     table_acl_group_combo(session)
     table_company(session)
@@ -337,6 +405,9 @@ def acs_data_engine() -> Engine:
     table_udf_sel(session)
     table_udf(session)
     table_cards(session)
+    table_device_group(session)
+    table_access_control_list(session)
+    table_location_cards(session)
 
     session.commit()
 
