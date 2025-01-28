@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from card_auto_add.windsx.db.models import UdfName
 from card_auto_add.windsx.lookup.person import PersonLookup, Person, InvalidUdfName, MissingRequiredUserDefinedField, \
     InvalidUdfSelection
+from card_auto_add.windsx.lookup.utils import LookupInfo
 from tests.conftest import location_group_id
 
 
@@ -122,6 +123,15 @@ class TestPersonLookup:
 
         person = people[0]
         self._assert_ray_securitay(person)
+
+    def test_lookup_by_invalid_id(self, lookup_info: LookupInfo):
+        person = Person(lookup_info, 5555)
+
+        assert not person.in_db
+        assert person.id == 5555
+        assert person.first_name is None
+        assert person.last_name is None
+        assert person.company_id is None
 
     def test_lookup_on_invalid_udf_name(self, person_lookup: PersonLookup):
         with pytest.raises(InvalidUdfName) as ex:

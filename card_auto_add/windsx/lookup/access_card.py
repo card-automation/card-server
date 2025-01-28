@@ -10,6 +10,10 @@ from card_auto_add.windsx.lookup.person import Person
 from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel
 
 
+class InvalidPersonForAccessCard(Exception):
+    pass
+
+
 class AccessCardLookup:
     def __init__(self,
                  lookup_info: LookupInfo):
@@ -137,10 +141,22 @@ class AccessCard(DbModel):
         self._in_db = True
 
     def write(self):
+        if self._name_id == 0:
+            raise InvalidPersonForAccessCard("The person must be set for an access card")
+
+        if not self.person.in_db:
+            raise InvalidPersonForAccessCard("The person for this card was not found")
+
         self._acl_group_combo.write()
 
-        # TODO Handle card is None
         card: CARDS = self._get_card_from_db()
+        if card is None:
+            card = CARDS(
+                LocGrp=self._location_group_id,
+                Code=self._card_number,
+                CardNum=str(self._card_number)
+            )
+
         card.NameID = self._name_id
         card.AclGrpComboID = self._acl_group_combo.id
         is_active: bool = len(self._acl_group_combo.names) > 0
@@ -151,6 +167,7 @@ class AccessCard(DbModel):
 
         self._session.add(card)
         self._session.commit()
+        self._card_id = card.ID
 
         # Creating this object does everything we need it to.
         _AccessControlListUpdater(
@@ -160,6 +177,7 @@ class AccessCard(DbModel):
             self._session
         )
 
+        self._in_db = True
         self._lookup_info.updated_callback(self)
 
 

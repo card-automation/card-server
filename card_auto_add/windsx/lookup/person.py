@@ -218,9 +218,16 @@ class Person(DbModel):
             self._in_db = False
             return
 
-        name: Optional[NAMES] = self._session.scalar(select(NAMES).where(NAMES.ID == self._name_id))
+        name: Optional[NAMES] = self._session.scalar(
+            select(NAMES)
+            .where(NAMES.ID == self._name_id)
+            .where(NAMES.LocGrp == self._location_group_id)
+        )
 
-        # TODO check name not found
+        self._user_defined_fields = {}
+        if name is None:
+            self._in_db = False
+            return
 
         self._first_name = name.FName
         self._last_name = name.LName
@@ -231,18 +238,19 @@ class Person(DbModel):
             .join(UDF, UDF.UdfNum == UdfName.UdfNum) \
             .where(UdfName.LocGrp == self._location_group_id) \
             .where(UDF.LocGrp == self._location_group_id) \
-            .where(UDF.NameID == name.ID)
+            .where(UDF.NameID == self._name_id)
         ).all()
 
-        self._user_defined_fields = {}
-        for name, value in user_defined_fields:
-            self._user_defined_fields[name] = value
+        for udf_name, value in user_defined_fields:
+            self._user_defined_fields[udf_name] = value
 
         self._in_db = True
 
     def write(self):
         name: Optional[NAMES] = self._session.scalar(
-            select(NAMES).where(NAMES.ID == self._name_id)
+            select(NAMES)
+            .where(NAMES.ID == self._name_id)
+            .where(NAMES.LocGrp == self._location_group_id)
         )
 
         if name is None:

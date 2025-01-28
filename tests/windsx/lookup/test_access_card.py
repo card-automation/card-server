@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, InstrumentedAttribute, Mapped
 
 from card_auto_add.windsx.db.models import CARDS, DGRP, ACL, LocCards, LOC
-from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard
+from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard, InvalidPersonForAccessCard
 from card_auto_add.windsx.lookup.person import Person, PersonLookup
 from card_auto_add.windsx.lookup.utils import LookupInfo
 from tests.conftest import main_location_id, annex_location_id
@@ -491,7 +491,51 @@ class TestAccessCardWrite:
         assert annex.DGrpCs == 0
         assert annex.CodeCs == 0
 
+    def test_writing_new_card(self,
+                              acs_updated_callback: Mock,
+                              access_card_lookup: AccessCardLookup,
+                              person_lookup: PersonLookup):
+        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        assert not access_card.in_db
+
+        person: Person = person_lookup.by_name("JaneThe", "BuildingManager").find()[0]
+
+        access_card.person = person
+        access_card.write()
+
+        acs_updated_callback.assert_called_once_with(access_card)
+
+        assert access_card.in_db
+        assert access_card.id != 0
+
+    def test_writing_new_card_with_no_person(self,
+                                             access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        assert not access_card.in_db
+
+        with pytest.raises(InvalidPersonForAccessCard):
+            access_card.write()
+
+    def test_writing_missing_person(self,
+                                    access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        assert not access_card.in_db
+
+        access_card.person = 5555  # This ID doesn't exist
+
+        with pytest.raises(InvalidPersonForAccessCard):
+            access_card.write()
+
+    def test_writing_missing_person_with_different_location_group(self,
+                                                                  access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        assert not access_card.in_db
+
+        access_card.person = 1101  # BobThe BuildingManager with bad location group
+
+        with pytest.raises(InvalidPersonForAccessCard):
+            access_card.write()
+
 # TODO
-# - Test brand new card
 # - Test master access level
 # - Test losing all access and how it affects various tables

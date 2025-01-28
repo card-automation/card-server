@@ -272,6 +272,8 @@ def table_names(session: Session):
 
         # Make sure we filter on location group id by using the same name as what we search for in the tests.
         NAMES(ID=1101, LocGrp=bad_location_group, FName="BobThe", LName="BuildingManager", Company=1),
+
+        # ID 5555 is reserved as a "this should never exist" person.
     ])
 
 
