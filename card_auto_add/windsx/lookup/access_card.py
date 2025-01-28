@@ -281,24 +281,39 @@ class _AccessControlListUpdater:
             for timezone, acl_groups in timezone_acl_groups.items():  # The timezone doesn't matter here
                 devices = set(x.Dev for x in acl_groups)
 
-                new_device_group: DGRP = DGRP(  # We make this just in case we need it later
-                    Loc=location_id,
-                    DlFlag=1,
-                    CkSum=0
-                )
-                query = select(DGRP).where(DGRP.Loc == location_id)
+                # We grab all the DGRP rows for this location. Trying to limit on the devices can cause an error in the
+                # MDB database.
+                device_groups = self._session.scalars(
+                    select(DGRP)
+                    .where(DGRP.Loc == location_id)
+                ).all()
 
-                for i in range(128):
-                    setattr(new_device_group, f"D{i}", (i in devices))
+                device_group: Optional[DGRP] = None
+                for group in device_groups:
+                    mismatch = False
 
-                    device_attr: InstrumentedAttribute = getattr(DGRP, f"D{i}")
-                    query = query.where(device_attr == (i in devices))
+                    for i in range(128):
+                        device_enabled: bool = getattr(group, f"D{i}")
+                        if device_enabled != (i in devices):
+                            mismatch = True
+                            break
 
-                device_group: Optional[DGRP] = self._session.scalar(query)
+                    if not mismatch:
+                        device_group = group
+                        break
 
                 if device_group is not None:
                     result[location_id][timezone] = device_group
                     continue
+
+                new_device_group: DGRP = DGRP(
+                    Loc=location_id,
+                    DlFlag=1,
+                    CkSum=0
+                )
+
+                for i in range(128):
+                    setattr(new_device_group, f"D{i}", (i in devices))
 
                 new_device_group.DGrp = self._session.scalar(select(func.max(DGRP.DGrp))) + 1  # Grab the next one
                 self._session.add(new_device_group)
