@@ -187,7 +187,6 @@ def table_devices(session: Session):
 
 def table_acl_group_name(session: Session):
     session.add_all([
-        # TODO Test how the IsMaster flag actually works. For LocCards, looks like it gets an Acl of 0.
         AclGrpName(ID=1, LocGrp=location_group_id, Name="Master Access Level", IsMaster=True),
         AclGrpName(ID=2, LocGrp=location_group_id, Name="Main Building Access"),
         AclGrpName(ID=3, LocGrp=location_group_id, Name="Tenant 1"),
@@ -211,7 +210,8 @@ def table_acl_group(session: Session):
         AclGrp(ID=8, AclGrpNameID=5, Loc=main_location_id, Dev=4, Tz1=1),  # Tenant 3 Access to Tenant 3 Door B
         AclGrp(ID=9, AclGrpNameID=5, Loc=annex_location_id, Dev=0, Tz1=1),  # Tenant 3 Access to Tenant 3 Annex Door
         AclGrp(ID=10, AclGrpNameID=4, Loc=annex_location_id, Dev=1, Tz1=1),  # Tenant 2 Access to Tenant 2 Annex Door
-        AclGrp(ID=9, AclGrpNameID=5, Loc=annex_location_id, Dev=2, Tz1=3),  # Tenant 3 Access to Tenant 3 Secret Lab Door
+        # Tenant 3 Access to Tenant 3 Secret Lab Door
+        AclGrp(ID=9, AclGrpNameID=5, Loc=annex_location_id, Dev=2, Tz1=3),
         # TODO bad main location
     ])
 
@@ -349,6 +349,7 @@ def table_cards(session: Session):
         # 10000: Used for lookup where card number isn't present
     ])
 
+
 def table_device_group(session: Session):
     session.add_all([
         # Main Building
@@ -364,6 +365,7 @@ def table_device_group(session: Session):
         DGRP(ID=5005, Loc=annex_location_id, DGrp=5, D2=True),
     ])
 
+
 def table_access_control_list(session: Session):
     session.add_all([
         # Tenant 1 main building access timezone 1
@@ -375,10 +377,12 @@ def table_access_control_list(session: Session):
         # Tenant 3 annex secret lab access timezone 3 is created in the tests
     ])
 
+
 def table_location_cards(session: Session):
     session.add_all([
         LocCards(ID=900, CardID=5, Loc=main_location_id, Acl=11),
     ])
+
 
 # TODO OLL
 # TODO Table IO
