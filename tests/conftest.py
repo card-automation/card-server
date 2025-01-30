@@ -4,6 +4,8 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from card_auto_add.plugin_worker import PluginWorker
+from card_auto_add.plugins.interfaces import Plugin
 from card_auto_add.windsx.db.engine_factory import EngineFactory
 from card_auto_add.windsx.db.models import *
 from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard
@@ -450,3 +452,28 @@ def acl_group_combo_lookup(lookup_info: LookupInfo) -> AclGroupComboLookup:
 @pytest.fixture
 def access_card_lookup(lookup_info: LookupInfo) -> AccessCardLookup:
     return AccessCardLookup(lookup_info)
+
+
+class PluginWorkerFactory:
+    def __init__(self):
+        self._workers: list[PluginWorker] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for worker in self._workers:
+            worker.stop(timeout=3)  # Tests should timeout pretty fast
+
+    def __call__(self, plugin: Plugin) -> PluginWorker:
+        worker = PluginWorker(plugin)
+        self._workers.append(worker)
+        worker.start()
+
+        return worker
+
+
+@pytest.fixture
+def plugin_worker_factory() -> PluginWorkerFactory:
+    with PluginWorkerFactory() as pwf:
+        yield pwf
