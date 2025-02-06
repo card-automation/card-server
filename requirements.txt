@@ -11,3 +11,4 @@ sentry-sdk==2.8.0
 SQLAlchemy
 sqlalchemy-access
 uuid
+watchdog

@@ -1,8 +1,15 @@
+import threading
+import time
+from pathlib import Path
+from typing import Generator, Optional
 from unittest.mock import Mock
 
 import pytest
+from _pytest.fixtures import FixtureRequest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
+from watchdog.events import FileSystemEventHandler, FileSystemEvent
+from watchdog.observers import Observer
 
 from card_auto_add.plugin_worker import PluginWorker
 from card_auto_add.plugins.interfaces import Plugin
@@ -390,10 +397,28 @@ def table_location_cards(session: Session):
 # TODO Table IO
 # TODO OllName
 
+@pytest.fixture
+def db_is_file(tmp_path: Path) -> Path:
+    db_path = tmp_path / "db"
+    db_path.mkdir(parents=True, exist_ok=True)
+    return db_path
+
 
 @pytest.fixture
-def acs_data_engine() -> Engine:
-    engine = EngineFactory.in_memory_sqlite()
+def acs_db_path(db_is_file: Path):
+    return db_is_file / "AcsData.db"
+
+
+@pytest.fixture
+def acs_data_engine(request: FixtureRequest) -> Engine:
+    # noinspection PyTestUnpassedFixture
+    acs_db_path_name = acs_db_path.__name__
+    if acs_db_path_name in request.fixturenames:
+        db_path: Path = request.getfixturevalue(acs_db_path_name)
+        db_path.touch()
+        engine = EngineFactory.file_sqlite(db_path)
+    else:
+        engine = EngineFactory.in_memory_sqlite()
     AcsDataBase.metadata.create_all(engine)
 
     session = Session(engine)
@@ -474,6 +499,56 @@ class PluginWorkerFactory:
 
 
 @pytest.fixture
-def plugin_worker_factory() -> PluginWorkerFactory:
+def plugin_worker_factory() -> Generator[PluginWorkerFactory, None, None]:
     with PluginWorkerFactory() as pwf:
         yield pwf
+
+
+class MyEventHandler(FileSystemEventHandler):
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        print(event)
+
+
+class PathWatcher(FileSystemEventHandler):
+    def __init__(self, path: Path):
+        self._path = path
+        self._modified = threading.Event()
+
+    def modified_wait(self, timeout: Optional[int] = None) -> bool:
+        if self._modified.wait(timeout):
+            self._modified.clear()
+            return True
+        return False
+
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        if not event.src_path.endswith('-journal'):
+            return
+        print("watcher", event.event_type, event.src_path, time.monotonic_ns())
+        self._modified.set()
+        # So essentially for us, the journal is created, updated, and then deleted on transaction commit.
+        # For MDB, it just modifies the Mdb file.
+
+
+class WatcherFactory:
+    def __init__(self):
+        self._observer = Observer()
+
+    def __enter__(self):
+        self._observer.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._observer.stop()
+        self._observer._wait_on_events()
+
+    def __call__(self, path: Path) -> PathWatcher:
+        watcher = PathWatcher(path)
+        self._observer.schedule(watcher, path)
+
+        return watcher
+
+
+@pytest.fixture
+def file_watcher() -> Generator[WatcherFactory, None, None]:
+    with WatcherFactory() as wf:
+        yield wf
