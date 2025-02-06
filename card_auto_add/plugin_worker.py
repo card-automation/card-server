@@ -55,7 +55,7 @@ class PluginWorker:
         next_loop_call_time = time.monotonic_ns()
 
         # If we've been told to exit, but still have events to send, we won't exit yet.
-        while not self._keep_running.is_set() or self._event_queue.not_empty:
+        while not self._keep_running.is_set() or not self._event_queue.empty():
             # Wait max of 1 second before continuing the loop. This balances delaying the thread's exit when requested
             # and handling events vs running a very tight CPU heavy loop.
             if self._wake_event.wait(1):
