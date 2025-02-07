@@ -1,8 +1,8 @@
 from datetime import datetime, date
-from typing import Optional, Union, Sequence
+from typing import Optional, Union, Callable, Any
 
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session, InstrumentedAttribute
+from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.models import CARDS, LOC, AclGrpName, AclGrpCombo, AclGrp, DGRP, ACL, LocCards
 from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboSet
@@ -34,6 +34,7 @@ class AccessCardLookup:
         ).all()
 
         # TODO Handle len(valid_cards) > 1
+        #  (This shouldn't happen on the UI side, but I don't think we prevent it yet with this framework)
 
         if len(valid_cards) == 0:
             access_card = AccessCard(self._lookup_info, 0)
@@ -174,7 +175,8 @@ class AccessCard(DbModel):
             self._location_group_id,
             self._card_id,
             self._acl_group_combo.id,
-            self._session
+            self._session,
+            self._lookup_info.updated_callback
         )
 
         self._in_db = True
@@ -193,15 +195,15 @@ class _AccessControlListUpdater:
                  location_group_id: int,
                  card_id: int,
                  acl_group_combo_id: int,
-                 session: Session):
+                 session: Session,
+                 updated_callback: Callable[[Any], None]):
         self._location_group_id = location_group_id
         self._card_id = card_id
         self._acl_group_combo_id = acl_group_combo_id
         self._session = session
+        self._update_callback = updated_callback
 
         self._location_ids_to_update: set[int] = set()
-
-        # TODO if acl group name ids length is 0, we should just delete any LocCards entry and call it a day
 
         self._locations: list[int] = self.__get_locations()
         self._acl_group_name_ids: list[int] = self.__get_acl_group_name_ids()
@@ -373,40 +375,14 @@ class _AccessControlListUpdater:
                     CardID=self._card_id,
                 )
 
-            something_changed = False
+            acl = acl_ids.pop() if acl_ids else -1
+            acl1 = acl_ids.pop() if acl_ids else -1
+            acl2 = acl_ids.pop() if acl_ids else -1
+            acl3 = acl_ids.pop() if acl_ids else -1
+            acl4 = acl_ids.pop() if acl_ids else -1
 
-            acl_names = ["Acl", "Acl1", "Acl2", "Acl3", "Acl4"]
-            while len(acl_names) > 0:
-                acl_name = acl_names.pop(0)
-
-                current_acl = getattr(loc_cards, acl_name)
-
-                if len(acl_ids) == 0:
-                    # Set it to the default in case it was set to something else before.
-                    if current_acl != -1:
-                        something_changed = True
-                        setattr(loc_cards, acl_name, -1)
-                    continue
-
-                acl = acl_ids.pop()
-
-                if current_acl == acl:
-                    continue
-
-                something_changed = True
-                setattr(loc_cards, acl_name, acl)
-
-            if not something_changed:
-                continue
-
-            loc_cards.DlFlag = 1
-            loc_cards.CkSum = 0
-
-            self._session.add(loc_cards)
-            self._session.commit()
-
-            # We updated an LocCards, so update this location
-            self._location_ids_to_update.add(location_id)
+            if self.__set_loc_cards_acls(loc_cards, acl, acl1, acl2, acl3, acl4):
+                self._location_ids_to_update.add(location_id)
 
         return result
 
@@ -437,17 +413,8 @@ class _AccessControlListUpdater:
             if loc_cards is None:
                 continue
 
-            loc_cards.DlFlag = 2  # The CommServer will delete this row
-            loc_cards.Acl = -1
-            loc_cards.Acl1 = -1
-            loc_cards.Acl2 = -1
-            loc_cards.Acl3 = -1
-            loc_cards.Acl4 = -1
-
-            self._location_ids_to_update.add(location_id)
-
-            self._session.add(loc_cards)
-            self._session.commit()
+            if self.__set_loc_cards_acls(loc_cards):
+                self._location_ids_to_update.add(location_id)
 
     def __update_loc_cards_to_master(self):
         for location_id in self._locations:
@@ -463,14 +430,42 @@ class _AccessControlListUpdater:
                     CardID=self._card_id,
                 )
 
-            loc_cards.DlFlag = 1
-            loc_cards.Acl = 0  # This is what sets the Acl to master
-            loc_cards.Acl1 = -1
-            loc_cards.Acl2 = -1
-            loc_cards.Acl3 = -1
-            loc_cards.Acl4 = -1
+            if self.__set_loc_cards_acls(
+                    loc_cards,
+                    0  # This is what sets the Acl to master
+            ):
+                self._location_ids_to_update.add(location_id)
 
-            self._location_ids_to_update.add(location_id)
+    def __set_loc_cards_acls(self,
+                             loc_cards: LocCards,
+                             acl: int = -1,
+                             acl1: int = -1,
+                             acl2: int = -1,
+                             acl3: int = -1,
+                             acl4: int = -1
+                             ) -> bool:
+        something_changed = False
+
+        acl_names = ["Acl", "Acl1", "Acl2", "Acl3", "Acl4"]
+        acl_ids = [acl, acl1, acl2, acl3, acl4]
+        for id_, name in zip(acl_ids, acl_names):
+            current_acl = getattr(loc_cards, name)
+
+            if current_acl == id_:
+                continue
+
+            something_changed = True
+            setattr(loc_cards, name, id_)
+
+        if something_changed:
+            # 2 means delete, 1 means update. If they're all "no access" of -1, then we just delete the row.
+            download = 2 if all(x == -1 for x in acl_ids) else 1
+            loc_cards.DlFlag = download
+            loc_cards.CkSum = 0
 
             self._session.add(loc_cards)
             self._session.commit()
+
+            self._update_callback(loc_cards)
+
+        return something_changed

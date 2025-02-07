@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Optional, Sequence, Union
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import pytest
 from sqlalchemy import select
@@ -177,7 +177,10 @@ class TestAccessCardWrite:
 
         access_card.write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 2
+        # Second call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
+
         access_card = access_card_lookup.by_card_number(2001)
 
         assert access_card.in_db
@@ -212,7 +215,10 @@ class TestAccessCardWrite:
 
         access_card.write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 3
+        # Second and third call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
+
         access_card = access_card_lookup.by_card_number(2002)
 
         assert access_card.in_db
@@ -267,7 +273,9 @@ class TestAccessCardWrite:
             .with_access(_acl_name_main_building_access) \
             .write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 2
+        # Second call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
 
         card: CARDS = db_helper.card_by_id(access_card.id)
         assert card.Status
@@ -310,7 +318,9 @@ class TestAccessCardWrite:
         access_card.person = person
         access_card.write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 3
+        # Second and third call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
 
         access_card: AccessCard = access_card_lookup.by_card_number(2000)
         assert access_card.in_db
@@ -331,7 +341,9 @@ class TestAccessCardWrite:
         access_card.person = person.id
         access_card.write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 3
+        # Second and third call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
 
         access_card: AccessCard = access_card_lookup.by_card_number(2000)
         assert access_card.in_db
@@ -412,6 +424,7 @@ class TestAccessCardWrite:
     def test_writing_card_creates_needed_loc_cards_entries(self,
                                                            acs_data_session: Session,
                                                            db_helper: DbHelper,
+                                                           acs_updated_callback: Mock,
                                                            access_card_lookup: AccessCardLookup):
         assert db_helper.loc_cards(5, main_location_id, 11) is not None
         starting_rows = acs_data_session.scalars(select(LocCards)).all()
@@ -460,9 +473,22 @@ class TestAccessCardWrite:
 
         assert ab_match or ba_match
 
+        assert acs_updated_callback.call_count == 2
+        # Called with new_loc_cards and access_card
+        acs_updated_callback.assert_called_with(access_card)
+        loc_cards_calls = [x
+                           for x in acs_updated_callback.call_args_list
+                           if len(x.args) == 1 and isinstance(x.args[0], LocCards)]
+        assert len(loc_cards_calls) == 1
+        loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
+        assert loc_cards_arg.ID == new_loc_cards.ID
+        assert loc_cards_arg.CardID == new_loc_cards.CardID
+        assert loc_cards_arg.Loc == new_loc_cards.Loc
+
     def test_removing_card_access_sets_loc_cards_row_for_deletion(self,
                                                                   acs_data_session: Session,
                                                                   db_helper: DbHelper,
+                                                                  acs_updated_callback: Mock,
                                                                   access_card_lookup: AccessCardLookup):
         assert db_helper.loc_cards(5, main_location_id, 11) is not None
         starting_rows = acs_data_session.scalars(select(LocCards)).all()
@@ -489,9 +515,22 @@ class TestAccessCardWrite:
         assert loc_cards.Acl3 == -1
         assert loc_cards.Acl4 == -1
 
+        assert acs_updated_callback.call_count == 2
+        # Called with loc_cards and access_card
+        acs_updated_callback.assert_called_with(access_card)
+        loc_cards_calls = [x
+                           for x in acs_updated_callback.call_args_list
+                           if len(x.args) == 1 and isinstance(x.args[0], LocCards)]
+        assert len(loc_cards_calls) == 1
+        loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
+        assert loc_cards_arg.ID == loc_cards.ID
+        assert loc_cards_arg.CardID == loc_cards.CardID
+        assert loc_cards_arg.Loc == loc_cards.Loc
+
     def test_giving_master_access_level_sets_acl_to_zero(self,
                                                          acs_data_session: Session,
                                                          db_helper: DbHelper,
+                                                         acs_updated_callback: Mock,
                                                          access_card_lookup: AccessCardLookup):
         starting_dgrp_rows = acs_data_session.scalars(select(DGRP)).all()
         starting_acl_rows = acs_data_session.scalars(select(ACL)).all()
@@ -532,6 +571,23 @@ class TestAccessCardWrite:
         assert annex_loc_cards.Acl2 == -1
         assert annex_loc_cards.Acl3 == -1
         assert annex_loc_cards.Acl4 == -1
+
+        assert acs_updated_callback.call_count == 3
+        # Called with main_loc_cards, annex_loc_cards, and access_card
+        acs_updated_callback.assert_called_with(access_card)
+
+        for loc_cards in [main_loc_cards, annex_loc_cards]:
+            loc_cards_calls = [
+                x for x in acs_updated_callback.call_args_list
+                if len(x.args) == 1 \
+                   and isinstance(x.args[0], LocCards) \
+                   and x.args[0].ID == loc_cards.ID
+            ]
+            assert len(loc_cards_calls) == 1
+            loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
+            assert loc_cards_arg.ID == loc_cards.ID
+            assert loc_cards_arg.CardID == loc_cards.CardID
+            assert loc_cards_arg.Loc == loc_cards.Loc
 
     def test_writing_card_updates_location_table_to_download(self,
                                                              db_helper: DbHelper,
