@@ -66,12 +66,20 @@ class Worker(Generic[T], abc.ABC):
 
 class EventsWorker(Generic[T], Worker[T]):
     def _run(self) -> None:
+        self._pre_run()
+
         while not self._keep_running.is_set() or not self._inbound_event_queue.empty():
             # If our event queue isn't empty, we want to start the loop immediately. Yes, there's a race condition where
             # our event queue could be empty, then an item is put into the queue from another thread and notifying the
             # wake condition before we wait on it. That only delays execution by 1 second which is acceptable.
             if self._inbound_event_queue.empty() and self._wake_event.wait(1):
                 self._wake_event.clear()
+
+            self._pre_event()
+
+            # There is a small race condition where we can have either two events submitted or an event and an exit
+            # request that would both set the _wake_event flag. In other words, regardless of the wake event state, we
+            # still want to check our _keep_running flag and see if there are any events to process.
 
             event: Optional[T] = None
             try:
@@ -84,6 +92,40 @@ class EventsWorker(Generic[T], Worker[T]):
                 if event is not None:
                     self._inbound_event_queue.task_done()
 
+            if self._keep_running.is_set() and event is None:
+                # We were told to exit and have no more events to process
+                break
+
+            self._post_event()
+
+        self._post_run()
+
     @abc.abstractmethod
     def _handle_event(self, event: T):
+        pass
+
+    def _pre_run(self) -> None:
+        """
+        Called before the event loop is started.
+        """
+        pass
+
+    def _post_run(self) -> None:
+        """
+        Called after the event loop finishes.
+        """
+        pass
+
+    def _pre_event(self) -> None:
+        """
+        Called before every event, regardless of if an event is available. Note that checking the queue is empty at this
+        point does not guarantee that the next `get` called on the queue won't return an event.
+        """
+        pass
+
+    def _post_event(self) -> None:
+        """
+        Called after every event, regardless of if there was an event to process. However, if the worker has been
+        requested to stop and there was no event, this method will not be called.
+        """
         pass

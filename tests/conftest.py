@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
-from card_auto_add.plugin_worker import PluginWorker
+from card_auto_add.workers.plugin_worker import PluginWorker
 from card_auto_add.plugins.interfaces import Plugin
 from card_auto_add.windsx.db.engine_factory import EngineFactory
 from card_auto_add.windsx.db.models import *
