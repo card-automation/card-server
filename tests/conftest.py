@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
+from card_auto_add.ioc import Resolver
 from card_auto_add.workers.plugin_worker import PluginWorker
 from card_auto_add.plugins.interfaces import Plugin
 from card_auto_add.windsx.db.engine_factory import EngineFactory
@@ -552,3 +553,7 @@ class WatcherFactory:
 def file_watcher() -> Generator[WatcherFactory, None, None]:
     with WatcherFactory() as wf:
         yield wf
+
+@pytest.fixture
+def resolver() -> Resolver:
+    return Resolver()
