@@ -6,12 +6,21 @@ from typing import Optional, TypeVar, Generic
 T = TypeVar('T')
 
 
-class Worker(Generic[T], abc.ABC):
+class Worker(abc.ABC):
     def __init__(self):
+        self._outbound_event_queue: Queue = Queue()
+
+    @property
+    def outbound_queue(self) -> Queue:
+        return self._outbound_event_queue
+
+
+class ThreadedWorker(Generic[T], Worker):
+    def __init__(self):
+        super().__init__()
         self._keep_running = threading.Event()
         self._wake_event = threading.Event()
         self._inbound_event_queue: Queue = Queue()
-        self._outbound_event_queue: Queue = Queue()
 
         self._thread = threading.Thread(target=self._run, daemon=False)
 
@@ -52,10 +61,6 @@ class Worker(Generic[T], abc.ABC):
         with self._inbound_event_queue.all_tasks_done:
             return self._inbound_event_queue.all_tasks_done.wait(timeout)
 
-    @property
-    def outbound_queue(self) -> Queue:
-        return self._outbound_event_queue
-
     @abc.abstractmethod
     def _run(self) -> None:
         pass
@@ -64,7 +69,7 @@ class Worker(Generic[T], abc.ABC):
         pass
 
 
-class EventsWorker(Generic[T], Worker[T]):
+class EventsWorker(ThreadedWorker[T]):
     def _run(self) -> None:
         self._pre_run()
 
