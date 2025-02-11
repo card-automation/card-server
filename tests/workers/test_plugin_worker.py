@@ -5,8 +5,11 @@ from typing import Optional
 
 import pytest
 
-from card_auto_add.plugins.interfaces import PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop
+from card_auto_add.plugins.interfaces import PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop, \
+    PluginCardDataPushed
 from card_auto_add.plugins.types import CardScan, CardScanEventType
+from card_auto_add.windsx.lookup.access_card import AccessCard, AccessCardLookup
+from card_auto_add.workers.events import AccessCardPushed, CardScanned
 from tests.conftest import PluginWorkerFactory
 
 
@@ -58,17 +61,47 @@ class TestPluginWorker:
 
         assert not plugin.called.is_set()
 
-        event = CardScan(
+        card_scan = CardScan(
             name_id=101,
             card_number=3000,
             scan_time=datetime.now(),
             device=0,
             event_type=CardScanEventType.ACCESS_GRANTED,
         )
+        event = CardScanned(
+            card_scan=card_scan
+        )
         worker.event(event)
 
         assert plugin.called.wait(1)
-        assert plugin.scan_data is event
+        assert plugin.scan_data is card_scan
+
+    def test_card_data_pushed(self,
+                              plugin_worker_factory: PluginWorkerFactory,
+                              access_card_lookup: AccessCardLookup
+                              ):
+        class _CardDataPushed(HasAssertableFlag, PluginCardDataPushed):
+            def __init__(self):
+                super().__init__()
+                self.access_card: Optional[AccessCard] = None
+
+            def card_data_pushed(self, access_card: AccessCard) -> None:
+                self.called.set()
+                self.access_card = access_card
+
+        plugin = _CardDataPushed()
+        worker = plugin_worker_factory(plugin)
+
+        assert not plugin.called.is_set()
+
+        access_card = access_card_lookup.by_card_number(2002)
+        event = AccessCardPushed(
+            access_card=access_card
+        )
+        worker.event(event)
+
+        assert plugin.called.wait(1)
+        assert plugin.access_card is access_card
 
     @pytest.mark.long  # This test takes ~7 seconds if successful, ~15 worst case if unsuccessful.
     def test_loop_timing(self, plugin_worker_factory: PluginWorkerFactory):
@@ -121,13 +154,14 @@ class TestPluginWorker:
         plugin = _CardScanned()
         worker = plugin_worker_factory(plugin)
 
-        event = CardScan(
+        card_scan = CardScan(
             name_id=101,
             card_number=3000,
             scan_time=datetime.now(),
             device=0,
             event_type=CardScanEventType.ACCESS_GRANTED,
         )
+        event = CardScanned(card_scan)
         # Queue that event 5 times. It shouldn't matter what event it is, just that we've queued it faster than the
         # events can be processed. We will process an event faster than once per second if the wait event flag is set
         # and cleared in time for the next event to be submitted. That potentially could happen after the first event

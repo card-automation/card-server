@@ -1,5 +1,6 @@
 import abc
 
+from card_auto_add.plugins.types import CardScan
 from card_auto_add.windsx.lookup.access_card import AccessCard
 
 
@@ -13,6 +14,15 @@ class AcsDatabaseUpdated(WorkerEvent):
 
 class LogDatabaseUpdated(WorkerEvent):
     pass
+
+
+class CardScanned(WorkerEvent):
+    def __init__(self, card_scan: CardScan):
+        self._card_scan = card_scan
+
+    @property
+    def card_scan(self) -> CardScan:
+        return self._card_scan
 
 
 class AccessCardUpdated(WorkerEvent):

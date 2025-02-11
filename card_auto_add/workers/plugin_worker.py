@@ -1,11 +1,15 @@
 import time
 from typing import Union
 
-from card_auto_add.plugins.interfaces import Plugin, PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop
-from card_auto_add.plugins.types import CardScan
+from card_auto_add.plugins.interfaces import Plugin, PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop, \
+    PluginCardDataPushed
+from card_auto_add.workers.events import AccessCardPushed, CardScanned
 from card_auto_add.workers.utils import EventsWorker
 
-_PluginEvent = Union[CardScan]
+_PluginEvent = Union[
+    CardScanned,
+    AccessCardPushed,
+]
 
 
 class PluginWorker(EventsWorker[_PluginEvent]):
@@ -39,5 +43,8 @@ class PluginWorker(EventsWorker[_PluginEvent]):
             self._plugin.shutdown()
 
     def _handle_event(self, event: _PluginEvent):
-        if isinstance(event, CardScan) and isinstance(self._plugin, PluginCardScanned):
-            self._plugin.card_scanned(event)
+        if isinstance(event, CardScanned) and isinstance(self._plugin, PluginCardScanned):
+            self._plugin.card_scanned(event.card_scan)
+
+        if isinstance(event, AccessCardPushed) and isinstance(self._plugin, PluginCardDataPushed):
+            self._plugin.card_data_pushed(event.access_card)
