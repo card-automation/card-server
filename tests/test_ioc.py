@@ -2,7 +2,7 @@ from typing import NewType
 
 import pytest
 
-from card_auto_add.ioc import Resolver, DuplicateArgOfSameType
+from card_auto_add.ioc import Resolver, DuplicateArgOfSameType, UnknownArgument, UnknownKeywordArgument
 
 
 class NoArgumentClass:
@@ -126,3 +126,20 @@ class TestArgsAndKwargs:
         assert isinstance(obj, TwoInts)
         assert obj.a == 3
         assert obj.b == 4
+
+    def test_will_error_if_cannot_find_match_for_arg(self, resolver: Resolver):
+        with pytest.raises(UnknownArgument) as ex:
+            resolver(NoArgumentClass, 3)
+
+        exception = ex.value
+        assert exception.argument_type == int
+        assert exception.argument == 3
+
+    def test_will_error_if_cannot_find_match_for_kwarg(self, resolver: Resolver):
+        with pytest.raises(UnknownKeywordArgument) as ex:
+            resolver(NoArgumentClass, a=3)
+
+        exception = ex.value
+        assert exception.argument_type == int
+        assert exception.argument_name == 'a'
+        assert exception.argument == 3
