@@ -9,7 +9,6 @@ class CardScanEventType(Enum):
     DENIED_UNKNOWN_CODE = 174
     DENIED_TIMEZONE_INACTIVE = 175
     DENIED_WRONG_ACCESS_LEVEL = 176
-    DENIED_UNKNOWN_FACILITY_CODE = 177
 
 
 @dataclass(frozen=True)

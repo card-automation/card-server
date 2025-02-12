@@ -12,6 +12,7 @@ from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
 from card_auto_add.ioc import Resolver
+from card_auto_add.plugins.types import CardScanEventType
 from card_auto_add.workers.plugin_worker import PluginWorker
 from card_auto_add.plugins.interfaces import Plugin
 from card_auto_add.windsx.db.engine_factory import EngineFactory
@@ -454,6 +455,49 @@ def acs_data_engine(request: FixtureRequest) -> Engine:
 def acs_data_session(acs_data_engine: Engine) -> Session:
     # This is required when we need to make a new db entry in another test fixture. The session must stay open.
     return Session(acs_data_engine)
+
+
+def table_log(session: Session):
+    session.add_all([
+        EvnLog(
+            TimeDate=datetime(2025, 1, 1),
+            Loc=main_location_id,
+            Event=CardScanEventType.ACCESS_GRANTED.value,
+            Dev=0,  # Main door
+            IO=11,  # Company with access granted
+            IOName="Main Door",
+            Code=3000,  # Card number
+            FName="BobThe",
+            LName="BuildingManager",
+            Opr="101"  # Name ID
+        )
+    ])
+
+
+@pytest.fixture
+def log_engine(request: FixtureRequest) -> Engine:
+    # noinspection PyTestUnpassedFixture
+    log_db_path_name = acs_db_path.__name__
+    if log_db_path_name in request.fixturenames:
+        db_path: Path = request.getfixturevalue(log_db_path_name)
+        db_path.touch()
+        engine = EngineFactory.file_sqlite(db_path)
+    else:
+        engine = EngineFactory.in_memory_sqlite()
+    LogDataBase.metadata.create_all(engine)
+
+    session = Session(engine)
+    table_log(session)
+
+    session.commit()
+
+    return engine
+
+
+@pytest.fixture
+def log_session(log_engine: Engine) -> Session:
+    # This is required when we need to make a new db entry in another test fixture. The session must stay open.
+    return Session(log_engine)
 
 
 @pytest.fixture
