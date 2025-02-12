@@ -14,6 +14,14 @@ class Worker(abc.ABC):
     def outbound_queue(self) -> Queue:
         return self._outbound_event_queue
 
+    @abc.abstractmethod
+    def start(self):
+        pass
+
+    @abc.abstractmethod
+    def stop(self, timeout: Optional[float] = None):
+        pass
+
 
 class ThreadedWorker(Generic[T], Worker):
     def __init__(self):

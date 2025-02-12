@@ -1,4 +1,4 @@
-from typing import Callable, Any
+from typing import Callable, Any, Optional
 
 from card_auto_add.windsx.db.models import LocCards
 from card_auto_add.windsx.lookup.access_card import AccessCard
@@ -9,6 +9,12 @@ from card_auto_add.workers.utils import Worker
 class UpdateCallbackWatcher(Worker):
     def __init__(self):
         super().__init__()
+
+    def start(self):
+        pass  # No thread to start
+
+    def stop(self, timeout: Optional[float] = None):
+        pass  # No thread to stop
 
     @property
     def acs_updated_callback(self) -> Callable[[Any], None]:
