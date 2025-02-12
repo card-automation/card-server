@@ -98,6 +98,21 @@ class TestBasicResolution:
         assert obj.log is log
         assert obj.acs is acs
 
+    def test_can_inspect_if_class_is_singleton(self, resolver: Resolver):
+        assert NoArgumentClass not in resolver
+        assert OneAnnotatedArgumentClass not in resolver
+
+        no_arg = resolver.singleton(NoArgumentClass)
+
+        assert NoArgumentClass in resolver
+        assert OneAnnotatedArgumentClass not in resolver
+
+        one_arg = resolver(OneAnnotatedArgumentClass)
+        assert one_arg.arg is no_arg
+
+        assert NoArgumentClass in resolver
+        # Not a singleton, so still not in the resolver even though it's been resolved
+        assert OneAnnotatedArgumentClass not in resolver
 
 class OneInt:
     def __init__(self, num: int):

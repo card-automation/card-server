@@ -116,3 +116,6 @@ class Resolver:
         self._bindings[cls] = instance
 
         return instance
+
+    def __contains__(self, cls: type[T]) -> bool:
+        return cls in self._bindings

@@ -46,6 +46,7 @@ def event_loop():
 
 
 class TestWorkerEventLoop:
+    @pytest.mark.long
     def test_will_propagate_wanted_event(self, event_loop: WorkerEventLoop):
         accepting = AcceptingWorker()
         emitting = EmittingWorker()
