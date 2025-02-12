@@ -30,7 +30,7 @@ class ThreadedWorker(Generic[T], Worker):
         self._wake_event = threading.Event()
         self._inbound_event_queue: Queue = Queue()
 
-        self._thread = threading.Thread(target=self._run, daemon=False)
+        self._thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):
         if self._thread.is_alive():
