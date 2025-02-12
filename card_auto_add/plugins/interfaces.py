@@ -64,3 +64,7 @@ class PluginLoop(Plugin):
         :return how many seconds until this method should be called again.
         """
         pass
+
+
+# TODO Plugin AcsDatabaseUpdated
+# TODO Plugin LogDatabaseUpdated
