@@ -57,6 +57,7 @@ class TestWorkerEventLoop:
         assert accepting.called.wait(1)
         assert isinstance(accepting.sent_event, AcsDatabaseUpdated)
 
+    @pytest.mark.long
     def test_will_not_propagate_unwanted_event(self, event_loop: WorkerEventLoop):
         unaccepting = UnacceptingWorker()
         emitting = EmittingWorker()

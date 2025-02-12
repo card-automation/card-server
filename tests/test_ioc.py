@@ -82,6 +82,12 @@ class TestBasicResolution:
         assert obj_a is instance
         assert obj_b is instance
 
+    def test_calling_singleton_twice_returns_same_instance(self, resolver: Resolver):
+        obj_a = resolver.singleton(NoArgumentClass)
+        obj_b = resolver.singleton(NoArgumentClass)
+
+        assert obj_a is obj_b
+
     def test_type_hinting_works_with_overridden_new_methods(self, resolver: Resolver):
         # We use singletons just so we can verify it put the arguments in the right order
         acs: AcsInstance = resolver.singleton(AcsInstance, AcsInstance(NoArgumentClass()))
