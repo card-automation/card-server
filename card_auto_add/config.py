@@ -50,7 +50,8 @@ class _ConfigHolder(abc.ABC):
     def __init__(self, config: Union[TOMLDocument, Table]):
         self._config = config
 
-        for attr_name, attr_type in self.__annotations__.items():
+        annotations = self.__annotations__ if hasattr(self, '__annotations__') else {}
+        for attr_name, attr_type in annotations.items():
             if attr_name.startswith('_'):
                 continue
 
@@ -71,6 +72,9 @@ class _ConfigHolder(abc.ABC):
 
                 setattr(self.__class__, attr_name, ConfigProperty(attr_name, args[0]))
 
+    def __repr__(self):
+        return repr(self._config)
+
 
 class _WinDSXConfig(_ConfigHolder):
     root: ConfigProperty[Path]
@@ -90,6 +94,45 @@ class _DSXPiConfig(_ConfigHolder):
 
 class _GitHubConfig(_ConfigHolder):
     api_key: ConfigProperty[str]
+
+
+class _PluginConfig(_ConfigHolder):
+    name: ConfigProperty[str]
+    github_org: ConfigProperty[str]
+    github_repo: ConfigProperty[str]
+    commit: ConfigProperty[str]
+
+
+class _PluginsConfig(_ConfigHolder):
+    def __init__(self, config: Union[TOMLDocument, Table]):
+        super().__init__(config)
+        self._plugins: dict[str, _PluginConfig] = {}
+
+    def keys(self):
+        return self._plugins.keys()
+
+    def values(self):
+        return self._plugins.values()
+
+    def items(self):
+        return self._plugins.items()
+
+    def __len__(self):
+        return len(self._plugins)
+
+    def __getitem__(self, item: str) -> _PluginConfig:
+        if item not in self._plugins:
+            table = tomlkit.table()
+            self._config[item] = table
+            self._plugins[item] = _PluginConfig(table)
+
+        return self._plugins[item]
+
+    def __contains__(self, item: str) -> bool:
+        return item in self._plugins
+
+    def __repr__(self):
+        return self._plugins.__repr__()
 
 
 class Config(_ConfigHolder):
@@ -115,3 +158,4 @@ class Config(_ConfigHolder):
     sentry: _SentryConfig
     dsxpi: _DSXPiConfig
     github: _GitHubConfig
+    plugins: _PluginsConfig
