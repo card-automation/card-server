@@ -77,4 +77,4 @@ class CommServerRestarter(EventsWorker[_Events]):
         os.kill(process.pid, signal.SIGTERM)
 
     def _start_comm_server(self):
-        subprocess.Popen(os.path.join(self._config.windsx_path, 'CS.exe'))
+        subprocess.Popen(os.path.join(self._config.windsx.root, 'CS.exe'))

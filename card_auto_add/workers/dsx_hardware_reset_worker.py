@@ -23,8 +23,8 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
                  acs_engine: AcsEngine
                  ):
         super().__init__()
-        self._dsx_pi_host = config.dsxpi_host
-        self._data_signing = DataSigning(config.dsxpi_signing_secret)
+        self._dsx_pi_host = config.dsxpi.host
+        self._data_signing = DataSigning(config.dsxpi.secret)
         self._session = Session(acs_engine)
         self._location_to_pending_timestamps: dict[int, datetime] = {}
         self._last_check_time: Optional[datetime] = None

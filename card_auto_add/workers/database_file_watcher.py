@@ -14,8 +14,8 @@ class DatabaseFileWatcher(Worker, FileSystemEventHandler):
                  config: Config
                  ):
         super().__init__()
-        self._acs_db_path = config.acs_data_db_path
-        self._log_db_path = config.log_db_path
+        self._acs_db_path = config.windsx.acs_data_db_path
+        self._log_db_path = config.windsx.log_db_path
 
         paths = self._get_observed_paths(
             self._acs_db_path,

@@ -8,5 +8,6 @@ requests
 sentry-sdk==2.8.0
 SQLAlchemy
 sqlalchemy-access
+tomlkit
 uuid
 watchdog
