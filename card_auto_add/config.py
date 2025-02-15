@@ -1,12 +1,8 @@
-import logging
-import os
+import configparser
 from logging import Logger
 from typing import Optional, Callable, TypeVar, Generic
 
-import appdirs
-import configparser
-
-from card_auto_add.slack_handler import SlackHandler
+from platformdirs import PlatformDirs
 
 T = TypeVar('T')
 
@@ -25,24 +21,16 @@ class ConfigProperty(Generic[T]):
 
 
 class Config(object):
-    def __init__(self, logger: Logger):
+    def __init__(self,
+                 dirs: PlatformDirs,
+                 logger: Logger
+                 ):
+        self._platformdirs = dirs
         self.logger: Logger = logger
-        # TODO Handle File not existing
-        config_path = os.path.join(appdirs.user_config_dir(), ".card_auto_add_config.ini")
+        config_path = self._platformdirs.site_config_path / "config.toml"  # TODO Make our reader/writer actually be toml
         parser = configparser.ConfigParser()
         parser.read(config_path)
         self._config = parser
-
-        # Slack specific logging
-        slack_formatter = logging.Formatter('%(levelname)s - %(message)s')
-
-        self.slack_logger = logging.getLogger("slack_card_access")
-        self.slack_logger.setLevel(logging.INFO)
-
-        slack_handler = SlackHandler(self.slack_log_url)
-        slack_handler.setLevel(logging.INFO)
-        slack_handler.setFormatter(slack_formatter)
-        self.slack_logger.addHandler(slack_handler)
 
     def __getitem__(self, item):
         return self._config[item]
@@ -50,14 +38,8 @@ class Config(object):
     acs_data_db_path = ConfigProperty('WINDSX', 'acs_data_db_path')
     log_db_path = ConfigProperty('WINDSX', 'log_db_path')
     windsx_path = ConfigProperty('WINDSX', 'root_path')
-    windsx_acl = ConfigProperty('WINDSX', 'acl')
-
-    ingester_api_key = ConfigProperty('INGEST', 'api_key')
-    ingester_api_url = ConfigProperty('INGEST', 'api_url')
 
     sentry_dsn = ConfigProperty('SENTRY', 'dsn')
-
-    slack_log_url = ConfigProperty('SLACK', 'webhook_url')
 
     dsxpi_host = ConfigProperty('DSXPI', 'host')
     dsxpi_signing_secret = ConfigProperty('DSXPI', 'signing_secret')

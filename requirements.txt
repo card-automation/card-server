@@ -1,11 +1,9 @@
-appdirs
 configparser
+platformdirs
 psutil
-pyinstaller
 pyodbc
 pysherplus
 pytest
-python-dateutil
 requests
 sentry-sdk==2.8.0
 SQLAlchemy
