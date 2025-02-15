@@ -2,11 +2,13 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import requests
-from sqlalchemy import Engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from card_auto_add.config import Config
 from card_auto_add.data_signing import DataSigning
 from card_auto_add.windsx.db.models import LOC
+from card_auto_add.windsx.engines import AcsEngine
 from card_auto_add.workers.events import AcsDatabaseUpdated
 from card_auto_add.workers.utils import EventsWorker
 
@@ -17,13 +19,12 @@ _Events = [
 
 class DSXHardwareResetWorker(EventsWorker[_Events]):
     def __init__(self,
-                 dsx_pi_host: str,
-                 dsx_pi_signing_secret: str,
-                 acs_engine: Engine
+                 config: Config,
+                 acs_engine: AcsEngine
                  ):
         super().__init__()
-        self._dsx_pi_host = dsx_pi_host
-        self._data_signing = DataSigning(dsx_pi_signing_secret)
+        self._dsx_pi_host = config.dsxpi_host
+        self._data_signing = DataSigning(config.dsxpi_signing_secret)
         self._session = Session(acs_engine)
         self._location_to_pending_timestamps: dict[int, datetime] = {}
         self._last_check_time: Optional[datetime] = None

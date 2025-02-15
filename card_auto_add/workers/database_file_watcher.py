@@ -4,22 +4,22 @@ from typing import Optional
 from watchdog.events import FileSystemEventHandler, FileSystemEvent, FileModifiedEvent
 from watchdog.observers import Observer
 
+from card_auto_add.config import Config
 from card_auto_add.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
 from card_auto_add.workers.utils import Worker
 
 
 class DatabaseFileWatcher(Worker, FileSystemEventHandler):
     def __init__(self,
-                 acs_db_path: Path,
-                 log_db_path: Path
+                 config: Config
                  ):
         super().__init__()
-        self._acs_db_path = acs_db_path
-        self._log_db_path = log_db_path
+        self._acs_db_path = config.acs_data_db_path
+        self._log_db_path = config.log_db_path
 
         paths = self._get_observed_paths(
-            acs_db_path,
-            log_db_path
+            self._acs_db_path,
+            self._log_db_path
         )
 
         self._observer = Observer()
