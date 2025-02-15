@@ -16,6 +16,10 @@ class LogDatabaseUpdated(WorkerEvent):
     pass
 
 
+class CommServerRestartRequested(WorkerEvent):
+    pass
+
+
 class CardScanned(WorkerEvent):
     def __init__(self, card_scan: CardScan):
         self._card_scan = card_scan

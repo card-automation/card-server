@@ -9,7 +9,7 @@ from card_auto_add.config import Config
 from card_auto_add.data_signing import DataSigning
 from card_auto_add.windsx.db.models import LOC
 from card_auto_add.windsx.engines import AcsEngine
-from card_auto_add.workers.events import AcsDatabaseUpdated
+from card_auto_add.workers.events import AcsDatabaseUpdated, CommServerRestartRequested
 from card_auto_add.workers.utils import EventsWorker
 
 _Events = [
@@ -40,7 +40,7 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
 
         for update_started_timestamp in self._location_to_pending_timestamps.values():
             if three_minutes_ago > update_started_timestamp:
-                self._reset_hardware()
+                self._reset()
 
     def _handle_event(self, event: _Events):
         if isinstance(event, AcsDatabaseUpdated):
@@ -65,9 +65,13 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
 
         self._last_check_time = datetime.now()
 
-    def _reset_hardware(self):
+    def _reset(self):
+        # Tell the hardware to restart
         signed_payload = self._data_signing.encode(10)
         url = f"{self._dsx_pi_host}/reset/{signed_payload}"
         response = requests.post(url)
 
         response.raise_for_status()
+
+        # Request that the comm server software restart
+        self._outbound_event_queue.put(CommServerRestartRequested())

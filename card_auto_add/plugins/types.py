@@ -18,3 +18,4 @@ class CardScan:
     scan_time: datetime
     device: int
     event_type: CardScanEventType
+    # TODO location id?
