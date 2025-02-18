@@ -41,7 +41,11 @@ class WorkerEventLoop(EventsWorker[Any]):
         self._worker_threads: list[_WorkerMonitorThread] = []
         self._event_to_workers: dict[WorkerEvent, list[EventsWorker]] = {}
 
-    def add(self, worker: Worker):
+    def add(self, *workers: Worker):
+        for worker in workers:
+            self._add(worker)
+
+    def _add(self, worker: Worker):
         if isinstance(worker, EventsWorker):
             bases = worker.__orig_bases__  # noqa
             event_worker_base = [b for b in bases if b.__origin__ == EventsWorker][0]

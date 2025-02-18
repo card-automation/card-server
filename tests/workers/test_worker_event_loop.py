@@ -69,3 +69,18 @@ class TestWorkerEventLoop:
 
         assert not unaccepting.called.wait(1)
         assert unaccepting.sent_event is None
+
+    @pytest.mark.long
+    def test_add_all(self, event_loop: WorkerEventLoop):
+        # Same setup as test_will_propagate_wanted_event, we're just adding them all in one call
+        accepting = AcceptingWorker()
+        emitting = EmittingWorker()
+
+        # We add accepting first, since emitting will emit immediately.
+        event_loop.add(
+            accepting,
+            emitting
+        )
+
+        assert accepting.called.wait(1)
+        assert isinstance(accepting.sent_event, AcsDatabaseUpdated)

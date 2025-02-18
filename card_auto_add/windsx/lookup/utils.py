@@ -3,6 +3,8 @@ from typing import Optional, Callable, Any
 
 from sqlalchemy import Engine
 
+from card_auto_add.windsx.engines import AcsEngine
+
 
 class DbModel(abc.ABC):
     def __init__(self):
@@ -25,11 +27,11 @@ class LookupInfo:
     """
 
     def __init__(self,
-                 acs_engine: Engine,
+                 acs_engine: AcsEngine,
                  location_group_id: int,
                  updated_callback: Callable[[Any], None]
                  ):
-        self._acs_engine = acs_engine
+        self._acs_engine: Engine = acs_engine
         self._location_group_id = location_group_id
         self._updated_callback = updated_callback
 

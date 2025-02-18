@@ -1,8 +1,9 @@
-from sqlalchemy import Engine, select, func
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from card_auto_add.plugins.types import CardScanEventType, CardScan
 from card_auto_add.windsx.db.models import EvnLog
+from card_auto_add.windsx.engines import LogEngine
 from card_auto_add.workers.events import LogDatabaseUpdated, CardScanned
 from card_auto_add.workers.utils import EventsWorker
 
@@ -12,7 +13,7 @@ _Events = [
 
 
 class CardScanWatcher(EventsWorker[LogDatabaseUpdated]):
-    def __init__(self, log_engine: Engine):
+    def __init__(self, log_engine: LogEngine):
         super().__init__()
         self._log_session = Session(log_engine)
         self._last_timestamp = self._log_session.scalar(select(func.max(EvnLog.TimeDate)))
