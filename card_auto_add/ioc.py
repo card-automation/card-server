@@ -31,6 +31,12 @@ class UnknownKeywordArgument(UnknownArgument):
         self.argument_name = argument_name
 
 
+class UnboundTypeRequested(ResolutionFailure):
+    def __init__(self, message: str, type_: type[T]):
+        super().__init__(message)
+        self.type = type_
+
+
 class Resolver:
     def __init__(self):
         self._bindings: dict[type['T'], T] = {}
@@ -124,3 +130,20 @@ class Resolver:
 
     def __contains__(self, cls: type[T]) -> bool:
         return cls in self._bindings
+
+    def clone(self, *types: type[T]) -> 'Resolver':
+        new_resolver = Resolver()
+
+        if len(types) == 0:
+            types = list(self._bindings.keys())
+
+        for t in types:
+            if t in self:
+                new_resolver.singleton(t, self(t))
+            else:
+                raise UnboundTypeRequested(
+                    f"Could not clone with requested type {t} as the parent resolver doesn't have it",
+                    type_=t
+                )
+
+        return new_resolver

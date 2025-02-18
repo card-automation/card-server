@@ -2,7 +2,8 @@ from typing import NewType
 
 import pytest
 
-from card_auto_add.ioc import Resolver, DuplicateArgOfSameType, UnknownArgument, UnknownKeywordArgument
+from card_auto_add.ioc import Resolver, DuplicateArgOfSameType, UnknownArgument, UnknownKeywordArgument, \
+    UnboundTypeRequested
 
 
 class NoArgumentClass:
@@ -123,6 +124,7 @@ class TestBasicResolution:
         # Not a singleton, so still not in the resolver even though it's been resolved
         assert OneAnnotatedArgumentClass not in resolver
 
+
 class OneInt:
     def __init__(self, num: int):
         self.num = num
@@ -173,3 +175,35 @@ class TestArgsAndKwargs:
         assert exception.argument_type == int
         assert exception.argument_name == 'a'
         assert exception.argument == 3
+
+
+class TestCloning:
+    def test_basic_clone(self, resolver: Resolver):
+        a = resolver.singleton(NoArgumentClass)
+
+        r2 = resolver.clone()
+
+        assert NoArgumentClass in r2
+        r2_a = r2(NoArgumentClass)
+        assert a is r2_a
+
+    def test_clone_with_specified_classes(self, resolver: Resolver):
+        a = resolver.singleton(NoArgumentClass)
+        b = resolver.singleton(OneAnnotatedArgumentClass)
+
+        r2 = resolver.clone(OneAnnotatedArgumentClass)
+
+        assert NoArgumentClass not in r2
+        r2_a = r2(NoArgumentClass)
+        assert r2_a is not a
+
+        assert OneAnnotatedArgumentClass
+        r2_b = r2(OneAnnotatedArgumentClass)
+        assert r2_b is b
+
+    def test_cloning_with_unbound_class_fails(self, resolver: Resolver):
+        with pytest.raises(UnboundTypeRequested) as ex:
+            resolver.clone(NoArgumentClass)
+
+        exception = ex.value
+        assert exception.type == NoArgumentClass
