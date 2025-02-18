@@ -1,5 +1,5 @@
 import inspect
-from typing import Optional
+from typing import Optional, Union
 
 from typing_extensions import TypeVar
 
@@ -110,9 +110,14 @@ class Resolver:
 
         return cls(**cls_kwargs)
 
-    def singleton(self, cls: type[T], instance: Optional[T] = None) -> T:
+    def singleton(self, cls: Union[type[T], T], instance: Optional[T] = None) -> T:
         if instance is None:
-            instance = self.__call__(cls)
+            if inspect.isclass(cls):
+                # noinspection PyTypeChecker
+                instance = self.__call__(cls)
+            else:
+                instance = cls
+                cls = type(instance)
         self._bindings[cls] = instance
 
         return instance

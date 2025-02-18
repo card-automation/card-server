@@ -73,6 +73,15 @@ class TestBasicResolution:
         assert obj_a is instance
         assert obj_b is instance
 
+    def test_resolving_singleton_by_instance_we_make_with_no_class_specified(self, resolver: Resolver):
+        instance = NoArgumentClass()
+        obj_a = resolver.singleton(instance)
+
+        obj_b = resolver(NoArgumentClass)
+
+        assert obj_a is instance
+        assert obj_b is instance
+
     def test_resolving_singleton_with_no_instance_specified(self, resolver: Resolver):
         instance = resolver.singleton(NoArgumentClass)
 
