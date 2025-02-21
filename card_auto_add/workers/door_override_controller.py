@@ -1,11 +1,10 @@
 import socket
 import time
-from collections import Counter
 from datetime import datetime, timedelta
 from typing import Union
 
 from card_auto_add.workers.events import DoorStateUpdate, DoorState
-from card_auto_add.workers.utils import EventsWorker, T
+from card_auto_add.workers.utils import EventsWorker
 
 _Events = Union[
     DoorStateUpdate

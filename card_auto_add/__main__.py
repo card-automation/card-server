@@ -14,6 +14,7 @@ from card_auto_add.workers.card_pushed_watcher import CardPushedWatcher
 from card_auto_add.workers.card_scan_watcher import CardScanWatcher
 from card_auto_add.workers.comm_server_restarter import CommServerRestarter
 from card_auto_add.workers.database_file_watcher import DatabaseFileWatcher
+from card_auto_add.workers.door_override_controller import DoorOverrideController
 from card_auto_add.workers.dsx_hardware_reset_worker import DSXHardwareResetWorker
 from card_auto_add.workers.update_callback_watcher import UpdateCallbackWatcher
 from card_auto_add.workers.worker_event_loop import WorkerEventLoop
@@ -50,6 +51,11 @@ class CardAutomationServer:
                                                log_db_path=self._config.windsx.log_db_path,
                                                )
 
+        door_override_controller = self._resolver(DoorOverrideController,
+                                                  workstation_number=self._config.windsx.workstation_number,
+                                                  comm_server_host=self._config.windsx.cs_host,
+                                                  comm_server_port=self._config.windsx.cs_port)
+
         self._worker_event_loop.add(
             # When someone updates a data model.
             self._resolver.singleton(update_callback_watcher),
@@ -62,7 +68,9 @@ class CardAutomationServer:
             # When someone badges in
             self._resolver.singleton(CardScanWatcher),
             # We want to provide updates for when we see a card is pushed out
-            self._resolver.singleton(CardPushedWatcher)
+            self._resolver.singleton(CardPushedWatcher),
+            # Allow plugins to override their doors
+            self._resolver.singleton(door_override_controller),
         )
 
 
