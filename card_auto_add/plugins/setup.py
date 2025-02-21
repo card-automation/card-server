@@ -2,9 +2,12 @@ import abc
 import importlib
 import inspect
 import pkgutil
+from abc import ABC
 from pathlib import Path
+from typing import Optional
 
 from card_auto_add.ioc import Resolver
+from card_auto_add.plugins.error_handling import ErrorHandler
 from card_auto_add.plugins.interfaces import Plugin
 
 
@@ -13,9 +16,13 @@ class PluginSetup(abc.ABC):
     def plugins(self) -> list[Plugin]:
         pass
 
+    @abc.abstractmethod
+    def error_handler(self) -> Optional[ErrorHandler]:
+        pass
+
 
 # TODO Unit test this
-class AutoDiscoverPlugins(PluginSetup):
+class AutoDiscoverPlugins(PluginSetup, ABC):
     def __init__(self, resolver: Resolver):
         self._resolver = resolver
 
