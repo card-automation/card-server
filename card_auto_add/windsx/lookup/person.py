@@ -39,7 +39,7 @@ class _SearchCriteria(enum.Enum):
 class _PersonSearchBase(abc.ABC):
     def __init__(self, lookup_info: LookupInfo):
         self._lookup_info: LookupInfo = lookup_info
-        self._location_group_id: int = self._lookup_info.location_group_id
+        self._location_group_id: int = lookup_info.location_group_id
         self._session = Session(lookup_info.acs_engine)
         self._criteria: dict[_SearchCriteria, Any] = {}
         self._udf_criteria: dict[str, str] = {}
@@ -171,7 +171,7 @@ class Person(DbModel):
                  lookup_info: LookupInfo,
                  name_id: int):
         self._lookup_info: LookupInfo = lookup_info
-        self._location_group_id: int = self._lookup_info.location_group_id
+        self._location_group_id: int = lookup_info.location_group_id
         self._session = Session(lookup_info.acs_engine)
         self._name_id: int = name_id
         self._first_name: Optional[str] = None

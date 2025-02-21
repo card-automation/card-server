@@ -1,7 +1,5 @@
-import threading
-import time
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator
 from unittest.mock import Mock
 
 import pytest
@@ -9,18 +7,17 @@ from _pytest.fixtures import FixtureRequest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
-from watchdog.observers import Observer
 
 from card_auto_add.ioc import Resolver
-from card_auto_add.plugins.types import CardScanEventType
-from card_auto_add.workers.plugin_worker import PluginWorker
 from card_auto_add.plugins.interfaces import Plugin
+from card_auto_add.plugins.types import CardScanEventType
 from card_auto_add.windsx.db.engine_factory import EngineFactory
 from card_auto_add.windsx.db.models import *
 from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard
 from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
 from card_auto_add.windsx.lookup.person import PersonLookup
 from card_auto_add.windsx.lookup.utils import LookupInfo
+from card_auto_add.workers.plugin_worker import PluginWorker
 
 location_group_id = 3
 main_location_id = 3
