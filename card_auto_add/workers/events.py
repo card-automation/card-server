@@ -1,4 +1,7 @@
 import abc
+import enum
+from dataclasses import dataclass
+from typing import Optional
 
 from card_auto_add.plugins.types import CardScan
 from card_auto_add.windsx.lookup.access_card import AccessCard
@@ -80,3 +83,17 @@ class AccessCardPushed(WorkerEvent):
     @property
     def access_card(self) -> AccessCard:
         return self._access_card
+
+
+class DoorState(enum.Enum):
+    OPEN = enum.auto()
+    SECURE = enum.auto()
+    TIMEZONE = enum.auto()
+
+
+@dataclass(frozen=True)
+class DoorStateUpdate(WorkerEvent):
+    location_id: int
+    device_id: int
+    state: DoorState
+    timeout: Optional[int]

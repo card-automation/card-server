@@ -1,5 +1,3 @@
-import enum
-from dataclasses import dataclass
 from typing import Optional
 
 from sqlalchemy import select
@@ -7,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from card_auto_add.windsx.db.models import DEV, LOC
 from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel
+from card_auto_add.workers.events import DoorStateUpdate, DoorState
 
 
 class DoorLookup:
@@ -48,20 +47,6 @@ class DoorLookup:
             return None
 
         return doors[0]
-
-
-class DoorState(enum.Enum):
-    OPEN = enum.auto()
-    SECURE = enum.auto()
-    TIMEZONE = enum.auto()
-
-
-@dataclass(frozen=True)
-class DoorStateUpdate:
-    location_id: int
-    device_id: int
-    state: DoorState
-    timeout: Optional[int]
 
 
 class Door(DbModel):

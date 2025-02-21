@@ -80,7 +80,12 @@ class _WinDSXConfig(_ConfigHolder):
     root: ConfigProperty[Path]
     acs_data_db_path: ConfigProperty[Path]
     log_db_path: ConfigProperty[Path]
+
     location_group: ConfigProperty[int]
+
+    cs_host: ConfigProperty[str]
+    cs_port: ConfigProperty[int]
+    workstation_number: ConfigProperty[int]
 
 
 class _SentryConfig(_ConfigHolder):
