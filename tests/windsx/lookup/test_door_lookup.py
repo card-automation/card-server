@@ -1,4 +1,6 @@
-from card_auto_add.windsx.lookup.door_lookup import DoorLookup, Door
+from unittest.mock import Mock
+
+from card_auto_add.windsx.lookup.door_lookup import DoorLookup, Door, DoorStateUpdate, DoorState
 from card_auto_add.windsx.lookup.utils import LookupInfo
 from tests.conftest import main_location_id, annex_location_id
 
@@ -76,3 +78,90 @@ class TestDoorLookup:
         door: Door = door_lookup.by_device_info(annex_location_id, 2)
 
         assert door is None
+
+
+class TestDoorStateChanges:
+    def test_open_sends_update(self,
+                               acs_updated_callback: Mock,
+                               lookup_info: LookupInfo):
+        door_lookup: DoorLookup = DoorLookup(lookup_info)
+        door: Door = door_lookup.by_id(1)
+
+        acs_updated_callback.assert_not_called()
+
+        door.open()
+
+        acs_updated_callback.assert_called_once_with(DoorStateUpdate(
+            location_id=main_location_id,
+            device_id=1,
+            state=DoorState.OPEN,
+            timeout=None
+        ))
+
+    def test_open_with_timeout(self,
+                               acs_updated_callback: Mock,
+                               lookup_info: LookupInfo):
+        door_lookup: DoorLookup = DoorLookup(lookup_info)
+        door: Door = door_lookup.by_id(1)
+
+        acs_updated_callback.assert_not_called()
+
+        door.open(5)
+
+        acs_updated_callback.assert_called_once_with(DoorStateUpdate(
+            location_id=main_location_id,
+            device_id=1,
+            state=DoorState.OPEN,
+            timeout=5
+        ))
+
+    def test_secure_sends_update(self,
+                                 acs_updated_callback: Mock,
+                                 lookup_info: LookupInfo):
+        door_lookup: DoorLookup = DoorLookup(lookup_info)
+        door: Door = door_lookup.by_id(1)
+
+        acs_updated_callback.assert_not_called()
+
+        door.secure()
+
+        acs_updated_callback.assert_called_once_with(DoorStateUpdate(
+            location_id=main_location_id,
+            device_id=1,
+            state=DoorState.SECURE,
+            timeout=None
+        ))
+
+    def test_secure_with_timeout(self,
+                                 acs_updated_callback: Mock,
+                                 lookup_info: LookupInfo):
+        door_lookup: DoorLookup = DoorLookup(lookup_info)
+        door: Door = door_lookup.by_id(1)
+
+        acs_updated_callback.assert_not_called()
+
+        door.secure(5)
+
+        acs_updated_callback.assert_called_once_with(DoorStateUpdate(
+            location_id=main_location_id,
+            device_id=1,
+            state=DoorState.SECURE,
+            timeout=5
+        ))
+
+    def test_timezone_sends_update(self,
+                                   acs_updated_callback: Mock,
+                                   lookup_info: LookupInfo):
+        door_lookup: DoorLookup = DoorLookup(lookup_info)
+        door: Door = door_lookup.by_id(1)
+
+        acs_updated_callback.assert_not_called()
+
+        door.timezone()
+
+        acs_updated_callback.assert_called_once_with(DoorStateUpdate(
+            location_id=main_location_id,
+            device_id=1,
+            state=DoorState.TIMEZONE,
+            timeout=None
+        ))

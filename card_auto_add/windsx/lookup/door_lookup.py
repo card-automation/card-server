@@ -1,3 +1,5 @@
+import enum
+from dataclasses import dataclass
 from typing import Optional
 
 from sqlalchemy import select
@@ -48,6 +50,20 @@ class DoorLookup:
         return doors[0]
 
 
+class DoorState(enum.Enum):
+    OPEN = enum.auto()
+    SECURE = enum.auto()
+    TIMEZONE = enum.auto()
+
+
+@dataclass(frozen=True)
+class DoorStateUpdate:
+    location_id: int
+    device_id: int
+    state: DoorState
+    timeout: Optional[int]
+
+
 class Door(DbModel):
     def __init__(self,
                  lookup_info: LookupInfo,
@@ -89,3 +105,27 @@ class Door(DbModel):
         self._device_id = dev.Device
         self._location_id = dev.Loc
         self._in_db = True
+
+    def open(self, timeout: Optional[int] = None):
+        self._lookup_info.updated_callback(DoorStateUpdate(
+            location_id=self.location_id,
+            device_id=self.device_id,
+            state=DoorState.OPEN,
+            timeout=timeout
+        ))
+
+    def secure(self, timeout: Optional[int] = None):
+        self._lookup_info.updated_callback(DoorStateUpdate(
+            location_id=self.location_id,
+            device_id=self.device_id,
+            state=DoorState.SECURE,
+            timeout=timeout
+        ))
+
+    def timezone(self):
+        self._lookup_info.updated_callback(DoorStateUpdate(
+            location_id=self.location_id,
+            device_id=self.device_id,
+            state=DoorState.TIMEZONE,
+            timeout=None
+        ))
