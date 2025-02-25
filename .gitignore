@@ -148,3 +148,6 @@ venv
 .idea/webServers.xml
 .DS_Store
 __pycache__
+
+# Don't accidentally commit private keys
+*.pem
