@@ -1,7 +1,9 @@
 import abc
 import threading
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from queue import Queue, Empty
-from typing import Optional, TypeVar, Generic
+from typing import Optional, TypeVar, Generic, Callable
 
 T = TypeVar('T')
 
@@ -77,7 +79,24 @@ class ThreadedWorker(Generic[T], Worker):
         pass
 
 
+@dataclass
+class _CallAfterTime:
+    callback: Callable[[], None]
+    how_often: timedelta
+    next_call: Optional[datetime] = field(default=None)
+
+
 class EventsWorker(ThreadedWorker[T]):
+    def __init__(self):
+        super().__init__()
+        self._call_after_time: list[_CallAfterTime] = []
+
+    def _call_every(self, how_often: timedelta, callback: Callable[[], None]):
+        self._call_after_time.append(_CallAfterTime(
+            callback=callback,
+            how_often=how_often
+        ))
+
     def _run(self) -> None:
         self._pre_run()
 
@@ -87,6 +106,14 @@ class EventsWorker(ThreadedWorker[T]):
             # wake condition before we wait on it. That only delays execution by 1 second which is acceptable.
             if self._inbound_event_queue.empty() and self._wake_event.wait(1):
                 self._wake_event.clear()
+
+            now = datetime.now()
+            for to_call in self._call_after_time:
+                if to_call.next_call is not None and to_call.next_call > now:
+                    continue
+
+                to_call.callback()
+                to_call.next_call = now + to_call.how_often
 
             self._pre_event()
 

@@ -27,16 +27,13 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
         self._data_signing = DataSigning(config.dsxpi.secret)
         self._session = Session(acs_engine)
         self._location_to_pending_timestamps: dict[int, datetime] = {}
-        self._last_check_time: Optional[datetime] = None
+
+        # Even if we don't see the AcsDatabaseUpdated event, we're going to manually check. Normally it should only take
+        # max 40 seconds to update, so checking every minute and failing every 3 minute handles all the worst cases.
+        self._call_every(timedelta(minutes=1), self._sync_locations_pending)
 
     def _post_event(self) -> None:
-        if self._last_check_time is None:
-            self._sync_locations_pending()
-
-        # Force a recheck every 3 minutes anyway
         three_minutes_ago = datetime.now() - timedelta(minutes=3)
-        if three_minutes_ago > self._last_check_time:
-            self._sync_locations_pending()
 
         for update_started_timestamp in self._location_to_pending_timestamps.values():
             if three_minutes_ago > update_started_timestamp:
@@ -62,8 +59,6 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
             # If we aren't downloading anymore but were watching for this timestamp, stop watching it
             if not is_downloading and location_id in self._location_to_pending_timestamps:
                 del self._location_to_pending_timestamps[location_id]
-
-        self._last_check_time = datetime.now()
 
     def _reset(self):
         # Tell the hardware to restart
