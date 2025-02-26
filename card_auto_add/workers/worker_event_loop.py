@@ -22,7 +22,7 @@ class _WorkerMonitorThread:
     def _run(self):
         while not self.stop_running.is_set():
             try:
-                event = self._worker.outbound_queue.get(timeout=10)
+                event = self._worker.outbound_queue.get(timeout=1)
 
                 if not isinstance(event, WorkerEvent):
                     continue
