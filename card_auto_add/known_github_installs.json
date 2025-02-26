@@ -5,5 +5,12 @@
     "repos": [
       "card-server"
     ]
+  },
+  {
+    "install_id": 61452042,
+    "owner": "Jnesselr",
+    "repos": [
+      "card-access-test"
+    ]
   }
 ]
