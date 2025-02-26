@@ -1,82 +1,16 @@
-import abc
-import inspect
+import sys
 from pathlib import Path
-from typing import TypeVar, Generic, Union, Optional, Callable
+from typing import Union, Optional, Tuple
 
 import tomlkit
 from platformdirs import PlatformDirs
 from tomlkit import TOMLDocument
 from tomlkit.items import Table
 
-T = TypeVar('T')
+from card_auto_add.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath
 
 
-class ConfigProperty(Generic[T]):
-    def __init__(self, name: str, type_: type[T]):
-        self._name = name
-        self._type = type_
-
-    def __get__(self, instance, owner) -> Optional[T]:
-        # noinspection PyProtectedMember
-        config = instance._config
-
-        if self._name not in config:
-            return None
-        raw_value = config[self._name]
-
-        if self._type == Path:
-            return Path(raw_value)
-
-        return raw_value
-
-    def __set__(self, instance, value: Optional[T]):
-        if not isinstance(value, self._type):
-            raise Exception(f"Trying to assign to {self._name} an invalid type of {type(value)}. Expected {self._type}")
-
-        # noinspection PyProtectedMember
-        config = instance._config
-
-        if value is None and self._name in config:
-            del config[self._name]
-            return
-
-        if self._type == Path:
-            value = str(value)
-
-        config[self._name] = value
-
-
-class _ConfigHolder(abc.ABC):
-    def __init__(self, config: Union[TOMLDocument, Table]):
-        self._config = config
-
-        annotations = self.__annotations__ if hasattr(self, '__annotations__') else {}
-        for attr_name, attr_type in annotations.items():
-            if attr_name.startswith('_'):
-                continue
-
-            if inspect.isclass(attr_type):
-                mro = inspect.getmro(attr_type)
-
-                if _ConfigHolder in mro:
-                    if attr_name not in self._config:
-                        self._config[attr_name] = tomlkit.table()
-
-                    setattr(self, attr_name, attr_type(self._config[attr_name]))
-                else:
-                    continue  # It was a class, but not a config holder. Not ours to mess with.
-            elif hasattr(attr_type, '__origin__') and attr_type.__origin__ == ConfigProperty:
-                args = attr_type.__args__
-                if len(args) != 1:
-                    raise Exception("Config property must have exactly one argument type")
-
-                setattr(self.__class__, attr_name, ConfigProperty(attr_name, args[0]))
-
-    def __repr__(self):
-        return repr(self._config)
-
-
-class _WinDSXConfig(_ConfigHolder):
+class _WinDSXConfig(ConfigHolder):
     root: ConfigProperty[Path]
     acs_data_db_path: ConfigProperty[Path]
     log_db_path: ConfigProperty[Path]
@@ -88,30 +22,61 @@ class _WinDSXConfig(_ConfigHolder):
     workstation_number: ConfigProperty[int]
 
 
-class _SentryConfig(_ConfigHolder):
+class _SentryConfig(ConfigHolder):
     dsn: ConfigProperty[str]
 
 
-class _DSXPiConfig(_ConfigHolder):
+class _DSXPiConfig(ConfigHolder):
     host: ConfigProperty[str]
     secret: ConfigProperty[str]
 
 
-class _GitHubConfig(_ConfigHolder):
+class _GitHubConfig(ConfigHolder):
     api_key: ConfigProperty[str]
+    private_key_path: ConfigProperty[Path]
+    app_id: ConfigProperty[int]
 
 
-class _PluginConfig(_ConfigHolder):
+class _PluginConfig(ConfigHolder):
+    def __init__(self,
+                 config: Union[TOMLDocument, Table],
+                 plugin_root: Path):
+        super().__init__(config)
+        self._plugin_root: Path = plugin_root
+
     name: ConfigProperty[str]
     github_org: ConfigProperty[str]
     github_repo: ConfigProperty[str]
     commit: ConfigProperty[str]
 
+    @property
+    def current_path(self) -> Optional[Path]:
+        path = self._plugin_root / "current"
 
-class _PluginsConfig(_ConfigHolder):
-    def __init__(self, config: Union[TOMLDocument, Table]):
+        # This allows us to break the symlink but still use the path
+        if not path.exists(follow_symlinks=False) and self.versioned_path.exists():
+            path.symlink_to(self.versioned_path, target_is_directory=True)
+
+        return path
+
+    @property
+    def versioned_path(self) -> Path:
+        return self._plugin_root / "versions" / self.commit
+
+    @property
+    def config_path(self) -> Path:
+        return self._plugin_root / "config.toml"
+
+
+class _PluginsConfig(ConfigHolder):
+    def __init__(self,
+                 config: Union[TOMLDocument, Table],
+                 dirs: PlatformDirs):
         super().__init__(config)
-        self._plugins: dict[str, _PluginConfig] = {}
+        self._plugins: dict[Tuple[str, str], _PluginConfig] = {}
+
+        self._data_root = dirs.user_data_path if sys.platform == "darwin" else dirs.site_data_path
+        self._data_root.mkdir(parents=True, exist_ok=True)
 
     def keys(self):
         return self._plugins.keys()
@@ -125,37 +90,39 @@ class _PluginsConfig(_ConfigHolder):
     def __len__(self):
         return len(self._plugins)
 
-    def __getitem__(self, item: str) -> _PluginConfig:
+    def __getitem__(self, owner: str, repo: str) -> _PluginConfig:
+        item = (owner, repo)
         if item not in self._plugins:
             table = tomlkit.table()
             self._config[item] = table
-            self._plugins[item] = _PluginConfig(table)
+            plugin_root = self._data_root / owner / repo
+            plugin_root.mkdir(parents=True, exist_ok=True)
+            self._plugins[item] = _PluginConfig(table, plugin_root)
 
         return self._plugins[item]
 
-    def __contains__(self, item: str) -> bool:
+    def __contains__(self, item: Tuple[str, str]) -> bool:
         return item in self._plugins
 
     def __repr__(self):
         return self._plugins.__repr__()
 
 
-class Config(_ConfigHolder):
+class Config(BaseConfig):
     def __init__(self, dirs: PlatformDirs):
         self._platformdirs = dirs
-        self._config_path = self._platformdirs.site_config_path / "config.toml"
 
-        config: TOMLDocument
-        if self._config_path.exists():
-            with self._config_path.open('r') as fh:
-                config = tomlkit.load(fh)
-        else:
-            config = tomlkit.document()
+        # Mac hates using the system path, so we just use the user path for testing.
+        config_root = dirs.user_config_path if sys.platform == "darwin" else dirs.site_config_path
+        config_root.mkdir(parents=True, exist_ok=True)
+        config_path = config_root / "config.toml"
 
-        super().__init__(config)
+        super().__init__(ConfigPath(config_path))
+
+    def _manual_config_setup(self):
+        self.plugins = _PluginsConfig(self._config, self._platformdirs)
 
     def write(self):
-        self._platformdirs.site_config_path.mkdir(parents=True, exist_ok=True)
         with self._config_path.open('w') as fh:
             tomlkit.dump(self._config, fh)
 
