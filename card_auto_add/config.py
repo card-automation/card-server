@@ -1,13 +1,48 @@
+import abc
 import sys
 from pathlib import Path
-from typing import Union, Optional, Tuple
+from typing import Optional, Tuple
 
 import tomlkit
 from platformdirs import PlatformDirs
-from tomlkit import TOMLDocument
-from tomlkit.items import Table
 
-from card_auto_add.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath
+from card_auto_add.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath, TomlConfigType
+
+
+class _HasCommitVersions:
+    commit: ConfigProperty[str]
+
+    @property
+    @abc.abstractmethod
+    def _root_path(self) -> Path:
+        pass
+
+    @property
+    def current_path(self) -> Optional[Path]:
+        path = self._root_path / "current"
+
+        # This allows us to break the symlink but still use the path
+        if not path.exists(follow_symlinks=False) and self.versioned_path.exists():
+            path.symlink_to(self.versioned_path, target_is_directory=True)
+
+        return path
+
+    @property
+    def versioned_path(self) -> Path:
+        return self._root_path / "versions" / self.commit
+
+
+class _DeployConfig(_HasCommitVersions, ConfigHolder):
+    def __init__(self,
+                 config: TomlConfigType,
+                 deploy_path: Path
+                 ):
+        super().__init__(config)
+        self._deploy_path: Path = deploy_path
+
+    @property
+    def _root_path(self) -> Path:
+        return self._deploy_path
 
 
 class _WinDSXConfig(ConfigHolder):
@@ -32,45 +67,34 @@ class _DSXPiConfig(ConfigHolder):
 
 
 class _GitHubConfig(ConfigHolder):
-    api_key: ConfigProperty[str]
     private_key_path: ConfigProperty[Path]
     app_id: ConfigProperty[int]
+    self_installation_id: ConfigProperty[int]
 
 
-class _PluginConfig(ConfigHolder):
+class _PluginConfig(_HasCommitVersions, ConfigHolder):
     def __init__(self,
-                 config: Union[TOMLDocument, Table],
+                 config: TomlConfigType,
                  plugin_root: Path):
         super().__init__(config)
-        self._plugin_root: Path = plugin_root
+        self._plugin_path: Path = plugin_root
+
+    @property
+    def _root_path(self) -> Path:
+        return self._plugin_path
 
     name: ConfigProperty[str]
     github_org: ConfigProperty[str]
     github_repo: ConfigProperty[str]
-    commit: ConfigProperty[str]
-
-    @property
-    def current_path(self) -> Optional[Path]:
-        path = self._plugin_root / "current"
-
-        # This allows us to break the symlink but still use the path
-        if not path.exists(follow_symlinks=False) and self.versioned_path.exists():
-            path.symlink_to(self.versioned_path, target_is_directory=True)
-
-        return path
-
-    @property
-    def versioned_path(self) -> Path:
-        return self._plugin_root / "versions" / self.commit
 
     @property
     def config_path(self) -> Path:
-        return self._plugin_root / "config.toml"
+        return self._plugin_path / "config.toml"
 
 
 class _PluginsConfig(ConfigHolder):
     def __init__(self,
-                 config: Union[TOMLDocument, Table],
+                 config: TomlConfigType,
                  dirs: PlatformDirs):
         super().__init__(config)
         self._plugins: dict[Tuple[str, str], _PluginConfig] = {}
@@ -126,6 +150,7 @@ class Config(BaseConfig):
         with self._config_path.open('w') as fh:
             tomlkit.dump(self._config, fh)
 
+    deploy: _DeployConfig
     windsx: _WinDSXConfig
     sentry: _SentryConfig
     dsxpi: _DSXPiConfig
