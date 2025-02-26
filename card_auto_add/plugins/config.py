@@ -101,3 +101,10 @@ class BaseConfig(ConfigHolder, abc.ABC):
             config = tomlkit.document()
 
         super().__init__(config)
+
+        if not self._config_path.exists():
+            self.write()
+
+    def write(self):
+        with self._config_path.open('w') as fh:
+            tomlkit.dump(self._config, fh)

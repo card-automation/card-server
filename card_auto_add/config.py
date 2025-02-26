@@ -33,16 +33,11 @@ class _HasCommitVersions:
 
 
 class _DeployConfig(_HasCommitVersions, ConfigHolder):
-    def __init__(self,
-                 config: TomlConfigType,
-                 deploy_path: Path
-                 ):
-        super().__init__(config)
-        self._deploy_path: Path = deploy_path
-
     @property
     def _root_path(self) -> Path:
-        return self._deploy_path
+        return self.root
+
+    root: ConfigProperty[Path]
 
 
 class _WinDSXConfig(ConfigHolder):
@@ -97,7 +92,7 @@ class _PluginsConfig(ConfigHolder):
                  config: TomlConfigType,
                  dirs: PlatformDirs):
         super().__init__(config)
-        self._plugins: dict[Tuple[str, str], _PluginConfig] = {}
+        self._plugins: dict[str, _PluginConfig] = {}
 
         self._data_root = dirs.user_data_path if sys.platform == "darwin" else dirs.site_data_path
         self._data_root.mkdir(parents=True, exist_ok=True)
@@ -114,19 +109,22 @@ class _PluginsConfig(ConfigHolder):
     def __len__(self):
         return len(self._plugins)
 
-    def __getitem__(self, owner: str, repo: str) -> _PluginConfig:
-        item = (owner, repo)
-        if item not in self._plugins:
+    def __getitem__(self, item: Tuple[str, str]) -> _PluginConfig:
+        owner, repo = item
+        key = f"{owner}/{repo}"
+        if key not in self._plugins:
             table = tomlkit.table()
-            self._config[item] = table
-            plugin_root = self._data_root / owner / repo
+            self._config[key] = table
+            plugin_root = self._data_root / "plugins" / owner / repo
             plugin_root.mkdir(parents=True, exist_ok=True)
-            self._plugins[item] = _PluginConfig(table, plugin_root)
+            self._plugins[key] = _PluginConfig(table, plugin_root)
 
-        return self._plugins[item]
+        return self._plugins[key]
 
     def __contains__(self, item: Tuple[str, str]) -> bool:
-        return item in self._plugins
+        owner, repo = item
+        key = f"{owner}/{repo}"
+        return key in self._plugins
 
     def __repr__(self):
         return self._plugins.__repr__()
@@ -145,10 +143,6 @@ class Config(BaseConfig):
 
     def _manual_config_setup(self):
         self.plugins = _PluginsConfig(self._config, self._platformdirs)
-
-    def write(self):
-        with self._config_path.open('w') as fh:
-            tomlkit.dump(self._config, fh)
 
     deploy: _DeployConfig
     windsx: _WinDSXConfig
