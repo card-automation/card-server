@@ -9,7 +9,7 @@ from platformdirs import PlatformDirs
 from card_auto_add.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath, TomlConfigType
 
 
-class _HasCommitVersions:
+class _HasCommitVersions(ConfigHolder):
     commit: ConfigProperty[str]
 
     @property

@@ -53,7 +53,7 @@ class ConfigHolder(abc.ABC):
 
         self._manual_config_setup()
 
-        annotations = self.__annotations__ if hasattr(self, '__annotations__') else {}
+        annotations = self._get_all_annotations()
         for attr_name, attr_type in annotations.items():
             if attr_name.startswith('_'):
                 continue
@@ -80,6 +80,19 @@ class ConfigHolder(abc.ABC):
 
     def __repr__(self):
         return repr(self._config)
+
+    def _get_all_annotations(self) -> dict:
+        result = {}
+
+        for cls in inspect.getmro(self.__class__):
+            annotations = cls.__annotations__ if hasattr(cls, '__annotations__') else {}
+            for name, value in annotations.items():
+                if name in result:
+                    continue
+
+                result[name] = value
+
+        return result
 
     def _manual_config_setup(self) -> None:
         """
