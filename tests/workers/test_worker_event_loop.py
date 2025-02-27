@@ -1,4 +1,5 @@
 import threading
+from typing import Union
 
 import pytest
 
@@ -24,6 +25,17 @@ class AcceptingWorker(EventsWorker[AcsDatabaseUpdated]):
 
 
 class UnacceptingWorker(EventsWorker[LogDatabaseUpdated]):
+    def __init__(self):
+        super().__init__()
+        self.called = threading.Event()
+        self.sent_event = None
+
+    def _handle_event(self, event):
+        self.sent_event = event
+        self.called.set()
+
+
+class UnionEventWorker(EventsWorker[Union[AcsDatabaseUpdated, LogDatabaseUpdated]]):
     def __init__(self):
         super().__init__()
         self.called = threading.Event()
@@ -63,12 +75,24 @@ class TestWorkerEventLoop:
         unaccepting = UnacceptingWorker()
         emitting = EmittingWorker()
 
-        # We add accepting first, since emitting will emit immediately.
+        # We add unaccepting first, since emitting will emit immediately.
         event_loop.add(unaccepting)
         event_loop.add(emitting)
 
         assert not unaccepting.called.wait(1)
         assert unaccepting.sent_event is None
+
+    @pytest.mark.long
+    def test_can_handle_union_event_type(self, event_loop: WorkerEventLoop):
+        union = UnionEventWorker()
+        emitting = EmittingWorker()
+
+        # We add accepting first, since emitting will emit immediately.
+        event_loop.add(union)
+        event_loop.add(emitting)
+
+        assert union.called.wait(1)
+        assert isinstance(union.sent_event, AcsDatabaseUpdated)
 
     @pytest.mark.long
     def test_add_all(self, event_loop: WorkerEventLoop):

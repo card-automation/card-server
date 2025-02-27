@@ -50,11 +50,18 @@ class WorkerEventLoop(EventsWorker[Any]):
             bases = worker.__orig_bases__  # noqa
             event_worker_base = [b for b in bases if b.__origin__ == EventsWorker][0]
 
-            args = event_worker_base.__args__
-            for arg in args:
-                if WorkerEvent not in inspect.getmro(arg):
-                    continue
+            def _yield_args(_args):
+                for _arg in _args:
+                    if hasattr(_arg, '__args__'):
+                        for _a in _yield_args(_arg.__args__):
+                            yield _a
+                    elif hasattr(_arg, '__mro__'):
+                        if WorkerEvent not in _arg.__mro__:
+                            continue
+                        yield _arg  # Yield only worker events
 
+            args = list(_yield_args(event_worker_base.__args__))
+            for arg in args:
                 if arg not in self._event_to_workers:
                     self._event_to_workers[arg] = []
 
