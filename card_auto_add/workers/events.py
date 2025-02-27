@@ -97,3 +97,7 @@ class DoorStateUpdate(WorkerEvent):
     device_id: int
     state: DoorState
     timeout: Optional[int]
+
+
+class ApplicationRestartNeeded(WorkerEvent):
+    pass

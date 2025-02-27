@@ -14,12 +14,12 @@ class _HasCommitVersions(ConfigHolder):
 
     @property
     @abc.abstractmethod
-    def _root_path(self) -> Path:
+    def root_path(self) -> Path:
         pass
 
     @property
     def current_path(self) -> Optional[Path]:
-        path = self._root_path / "current"
+        path = self.root_path / "current"
 
         # This allows us to break the symlink but still use the path
         if not path.exists(follow_symlinks=False) and self.versioned_path.exists():
@@ -29,15 +29,16 @@ class _HasCommitVersions(ConfigHolder):
 
     @property
     def versioned_path(self) -> Path:
-        return self._root_path / "versions" / self.commit
+        return self.root_path / "versions" / self.commit
 
 
 class _DeployConfig(_HasCommitVersions, ConfigHolder):
     @property
-    def _root_path(self) -> Path:
+    def root_path(self) -> Path:
         return self.root
 
     root: ConfigProperty[Path]
+    environment: ConfigProperty[str]
 
 
 class _WinDSXConfig(ConfigHolder):
@@ -75,7 +76,7 @@ class _PluginConfig(_HasCommitVersions, ConfigHolder):
         self._plugin_path: Path = plugin_root
 
     @property
-    def _root_path(self) -> Path:
+    def root_path(self) -> Path:
         return self._plugin_path
 
     name: ConfigProperty[str]
