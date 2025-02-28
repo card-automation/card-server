@@ -79,10 +79,6 @@ class _PluginConfig(_HasCommitVersions, ConfigHolder):
     def root_path(self) -> Path:
         return self._plugin_path
 
-    name: ConfigProperty[str]
-    github_org: ConfigProperty[str]
-    github_repo: ConfigProperty[str]
-
     @property
     def config_path(self) -> Path:
         return self._plugin_path / "config.toml"
