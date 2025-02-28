@@ -1,4 +1,5 @@
 import abc
+import enum
 import inspect
 import logging
 from logging import Logger
@@ -31,6 +32,8 @@ class ConfigProperty(Generic[T]):
 
         if self._type == Path:
             return Path(raw_value)
+        if isinstance(self._type, enum.EnumType):
+            return self._type(raw_value)
 
         return raw_value
 
