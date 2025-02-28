@@ -1,3 +1,4 @@
+from datetime import timedelta
 from typing import Optional
 
 from sqlalchemy import select
@@ -106,7 +107,7 @@ class Door(DbModel):
         self._location_id = dev.Loc
         self._in_db = True
 
-    def open(self, timeout: Optional[int] = None):
+    def open(self, timeout: Optional[timedelta] = None):
         self._lookup_info.updated_callback(DoorStateUpdate(
             location_id=self.location_id,
             device_id=self.device_id,
@@ -114,7 +115,7 @@ class Door(DbModel):
             timeout=timeout
         ))
 
-    def secure(self, timeout: Optional[int] = None):
+    def secure(self, timeout: Optional[timedelta] = None):
         self._lookup_info.updated_callback(DoorStateUpdate(
             location_id=self.location_id,
             device_id=self.device_id,

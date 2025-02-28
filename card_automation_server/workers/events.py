@@ -1,6 +1,7 @@
 import abc
 import enum
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Optional
 
 from card_automation_server.plugins.types import CardScan
@@ -96,7 +97,7 @@ class DoorStateUpdate(WorkerEvent):
     location_id: int
     device_id: int
     state: DoorState
-    timeout: Optional[int]
+    timeout: Optional[timedelta]
 
 
 class ApplicationRestartNeeded(WorkerEvent):

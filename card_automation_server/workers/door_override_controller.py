@@ -1,6 +1,6 @@
 import socket
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Union
 
 from card_automation_server.workers.events import DoorStateUpdate, DoorState
@@ -47,7 +47,7 @@ class DoorOverrideController(EventsWorker[_Events]):
 
         if event.timeout is not None:
             now = datetime.now()
-            then = now + timedelta(seconds=event.timeout)
+            then = now + event.timeout
             self._timeout_map[event.location_id, event.device_id] = then
 
     def _set_state_with_retries(self,

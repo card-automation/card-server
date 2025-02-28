@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from unittest.mock import Mock
 
@@ -140,13 +140,13 @@ class TestDoorStateChanges:
 
         acs_updated_callback.assert_not_called()
 
-        door.open(5)
+        door.open(timedelta(seconds=5))
 
         acs_updated_callback.assert_called_once_with(DoorStateUpdate(
             location_id=main_location_id,
             device_id=1,
             state=DoorState.OPEN,
-            timeout=5
+            timeout=timedelta(seconds=5)
         ))
 
     def test_secure_sends_update(self,
@@ -174,13 +174,13 @@ class TestDoorStateChanges:
 
         acs_updated_callback.assert_not_called()
 
-        door.secure(5)
+        door.secure(timedelta(seconds=5))
 
         acs_updated_callback.assert_called_once_with(DoorStateUpdate(
             location_id=main_location_id,
             device_id=1,
             state=DoorState.SECURE,
-            timeout=5
+            timeout=timedelta(seconds=5)
         ))
 
     def test_timezone_sends_update(self,
