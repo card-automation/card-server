@@ -6,7 +6,7 @@ from typing import Optional
 
 from card_automation_server.config import Config
 from card_automation_server.ioc import Resolver
-from card_automation_server.plugins.config import ConfigPath
+from card_automation_server.plugins.config import ConfigPath, LogPath
 from card_automation_server.plugins.error_handling import ErrorHandler
 from card_automation_server.plugins.interfaces import Plugin
 from card_automation_server.plugins.setup import PluginSetup, HasErrorHandler
@@ -44,6 +44,7 @@ class PluginLoader:
 
         self._plugin_config = config.plugins[self._owner, self._repo]
         self._sub_resolver.singleton(ConfigPath, self._plugin_config.config_path)
+        self._sub_resolver.singleton(LogPath, self._plugin_config.log_path)
 
         doors = self._config.windsx.common_doors if self._config.windsx.common_doors is not None else []
         doors.extend(self._plugin_config.doors if self._plugin_config.doors is not None else [])

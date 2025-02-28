@@ -6,7 +6,8 @@ from typing import Optional, Tuple
 import tomlkit
 from platformdirs import PlatformDirs
 
-from card_automation_server.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath, TomlConfigType
+from card_automation_server.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath, TomlConfigType, \
+    LogPath
 
 
 class _HasCommitVersions(ConfigHolder):
@@ -85,6 +86,10 @@ class _PluginConfig(_HasCommitVersions, ConfigHolder):
     def config_path(self) -> Path:
         return self._plugin_path / "config.toml"
 
+    @property
+    def log_path(self) -> Path:
+        return self._plugin_path / "plugin.log"
+
     doors: ConfigProperty[list[int]]
 
 
@@ -143,7 +148,9 @@ class Config(BaseConfig):
         config_root.mkdir(parents=True, exist_ok=True)
         config_path = config_root / "config.toml"
 
-        super().__init__(ConfigPath(config_path))
+        log_path: Path = config_root / "card-server.log"
+
+        super().__init__(ConfigPath(config_path), LogPath(log_path))
 
     def _manual_config_setup(self):
         if "plugins" not in self._config:

@@ -1,5 +1,7 @@
 import abc
 import inspect
+import logging
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import NewType, TypeVar, Generic, Optional, Union
 
@@ -7,6 +9,7 @@ import tomlkit
 import tomlkit.items
 
 ConfigPath = NewType('ConfigPath', Path)
+LogPath = NewType('LogPath', Path)
 
 T = TypeVar('T')
 TomlConfigType = Union[tomlkit.TOMLDocument, tomlkit.items.Table]
@@ -114,8 +117,32 @@ class ConfigHolder(abc.ABC):
 
 
 class BaseConfig(ConfigHolder, abc.ABC):
-    def __init__(self, config_path: ConfigPath):
+    def __init__(self, config_path: ConfigPath, log_path: LogPath):
         self._config_path: Path = config_path
+        self._log_path: Path = log_path
+
+        module_name = self.__module__
+        if '.' in module_name:
+            module_name = module_name[:module_name.index('.')]
+        self._logger = logging.getLogger(module_name)
+        self._logger.setLevel(logging.INFO)
+
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+        # Console logging handler
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+        self._logger.addHandler(console_handler)
+
+        # File logging handler
+        max_bytes = 1 * 1024 * 1024
+        file_handler = RotatingFileHandler(self._log_path,
+                                           maxBytes=max_bytes,
+                                           backupCount=10)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        self._logger.addHandler(file_handler)
 
         config: tomlkit.TOMLDocument
         if self._config_path.exists():

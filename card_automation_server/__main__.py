@@ -13,6 +13,7 @@ from sentry_sdk import capture_exception
 from card_automation_server.config import Config
 from card_automation_server.ioc import Resolver
 from card_automation_server.plugin_loader import PluginLoader
+from card_automation_server.plugins.config import LogPath
 from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.engines import AcsEngine, LogEngine
 from card_automation_server.windsx.lookup.access_card import AccessCardLookup
@@ -30,10 +31,10 @@ from card_automation_server.workers.worker_event_loop import WorkerEventLoop
 
 
 class CardAutomationServer:
-    def __init__(self, logger: Logger):
+    def __init__(self):
         self._resolver = Resolver()
         self._platformdirs: PlatformDirs = PlatformDirs("card-server", "card-automation")
-        self._logger = self._resolver.singleton(Logger, logger)
+
         self._config = self._resolver(Config)
         sentry_sdk.init(self._config.sentry.dsn)
 
@@ -112,27 +113,7 @@ cas: Optional[CardAutomationServer] = None
 
 def main():
     global cas
-    logger = logging.getLogger("card_access")
-    logger.setLevel(logging.INFO)
-
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-    # Console logging handler
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # File logging handler
-    max_bytes = 1 * 1024 * 1024
-    file_handler = RotatingFileHandler("C:/Users/700 Kalamath/.cards/card_access.log",
-                                       maxBytes=max_bytes,
-                                       backupCount=10)
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    cas = CardAutomationServer(logger)
+    cas = CardAutomationServer()
     while cas.is_alive:
         time.sleep(1)
 
