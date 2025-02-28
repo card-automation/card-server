@@ -1,6 +1,7 @@
 import abc
 import inspect
 import logging
+from logging import Logger
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import NewType, TypeVar, Generic, Optional, Union
@@ -119,7 +120,6 @@ class ConfigHolder(abc.ABC):
 class BaseConfig(ConfigHolder, abc.ABC):
     def __init__(self, config_path: ConfigPath, log_path: LogPath):
         self._config_path: Path = config_path
-        self._log_path: Path = log_path
 
         module_name = self.__module__
         if '.' in module_name:
@@ -137,7 +137,7 @@ class BaseConfig(ConfigHolder, abc.ABC):
 
         # File logging handler
         max_bytes = 1 * 1024 * 1024
-        file_handler = RotatingFileHandler(self._log_path,
+        file_handler = RotatingFileHandler(log_path,
                                            maxBytes=max_bytes,
                                            backupCount=10)
         file_handler.setLevel(logging.INFO)
@@ -159,3 +159,7 @@ class BaseConfig(ConfigHolder, abc.ABC):
     def write(self):
         with self._config_path.open('w') as fh:
             tomlkit.dump(self._config, fh)
+
+    @property
+    def logger(self) -> Logger:
+        return self._logger
