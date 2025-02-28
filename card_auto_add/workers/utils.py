@@ -59,7 +59,6 @@ class ThreadedWorker(Generic[T], Worker):
 
                 if self._thread.is_alive():
                     # Thread timed out
-                    # TODO Handle this better as it's not necessarily the worker thread's fault that the timeout occurred
                     raise Exception("Worker thread timed out")
         finally:
             self._cleanup()

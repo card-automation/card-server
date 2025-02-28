@@ -41,7 +41,8 @@ class CardScanWatcher(EventsWorker[LogDatabaseUpdated]):
                         card_number=int(event.Code),
                         scan_time=event.TimeDate,
                         device=event.Dev,
-                        event_type=CardScanEventType(event.Event)
+                        event_type=CardScanEventType(event.Event),
+                        location_id=int(event.Loc)
                     )
                 )
             )

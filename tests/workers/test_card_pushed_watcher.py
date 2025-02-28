@@ -228,6 +228,3 @@ class TestCardPushedWatcher:
 
         assert card_pushed_watcher.outbound_queue.qsize() == 0
         assert outbound_event_queue_empty()
-
-# TODO
-# - Updates from a different location group are ignored

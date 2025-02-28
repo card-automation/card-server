@@ -104,7 +104,9 @@ class PluginLoader:
                     instance: HasErrorHandler
                     self._error_handler = instance.error_handler()
 
-                for plugin in instance.plugins():
+                plugins_method = self._wrap_errors(instance.plugins)
+
+                for plugin in plugins_method():
                     if not hasattr(plugin.__class__, '__mro__'):
                         continue  # Shouldn't happen, but if it does, we didn't get a plugin back
 
@@ -127,7 +129,7 @@ class PluginLoader:
         def _inner(*args, **kwargs):
             # noinspection PyBroadException
             try:
-                func(*args, **kwargs)
+                return func(*args, **kwargs)
             except BaseException as ex:
                 if self._error_handler is not None:
                     self._error_handler.capture_exception(ex)

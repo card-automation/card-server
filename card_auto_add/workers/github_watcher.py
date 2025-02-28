@@ -287,17 +287,18 @@ class GitHubWatcher(EventsWorker[_Events]):
         )
 
     def _check_for_updates(self) -> None:
-        self._check_for_update(self._main_owner, self._main_repo, self._config.deploy)
+        self._check_for_update(self._main_owner, self._main_repo)
 
         for owner_repo, plugin in self._config.plugins.items():
             owner, repo = owner_repo.split("/")
-            self._check_for_update(owner=owner, repo=repo, deploy=plugin)
+            self._check_for_update(owner=owner, repo=repo)
 
-    def _check_for_update(self, owner: str, repo: str, deploy: _HasCommitVersions):
+    def _check_for_update(self, owner: str, repo: str):
         if self._deployment_in_progress.is_set():
             return
+        deploy, github = self._get_deploy_and_github(owner, repo)
 
-        latest_commit: Commit = self._github_main.rest.repos.list_commits(
+        latest_commit: Commit = github.rest.repos.list_commits(
             owner=owner,
             repo=repo,
             per_page=1
@@ -382,7 +383,6 @@ class GitHubWatcher(EventsWorker[_Events]):
 
             for status in statuses:
                 # If it succeeded, we shouldn't have even been told about it.
-                # TODO Decide on if that's an error condition for "production" environment
                 # If it failed, a new commit will probably be pushed
                 if status.state in ["success", "failure"]:
                     should_deploy = False

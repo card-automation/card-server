@@ -60,7 +60,6 @@ class TestPersonLookup:
         assert person.user_defined_fields['ID'] == "5000"
         assert 'Fruit' in person.user_defined_fields
         assert person.user_defined_fields['Fruit'] == "Apple"
-        # TODO assert cards
 
     @staticmethod
     def _assert_ray_securitay(person: Person):
@@ -71,7 +70,6 @@ class TestPersonLookup:
         assert person.company_id == 2
 
         assert len(person.user_defined_fields) == 0
-        # TODO assert cards
 
     def test_lookup_by_name(self, person_lookup: PersonLookup):
         people = person_lookup.by_name('BobThe', 'BuildingManager').find()

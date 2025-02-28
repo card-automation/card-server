@@ -220,7 +220,8 @@ def table_acl_group(session: Session):
         AclGrp(ID=10, AclGrpNameID=4, Loc=annex_location_id, Dev=1, Tz1=1),  # Tenant 2 Access to Tenant 2 Annex Door
         # Tenant 3 Access to Tenant 3 Secret Lab Door
         AclGrp(ID=9, AclGrpNameID=5, Loc=annex_location_id, Dev=2, Tz1=3),
-        # TODO bad main location
+        # Invalid main location id, should be ignored
+        AclGrp(ID=10, AclGrpNameID=5, Loc=bad_main_location_id, Dev=2, Tz1=3),
     ])
 
 
@@ -391,10 +392,6 @@ def table_location_cards(session: Session):
         LocCards(ID=900, CardID=5, Loc=main_location_id, Acl=11),
     ])
 
-
-# TODO OLL
-# TODO Table IO
-# TODO OllName
 
 @pytest.fixture
 def db_is_file(tmp_path: Path) -> Path:

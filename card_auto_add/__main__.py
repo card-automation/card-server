@@ -1,6 +1,10 @@
 import logging
+import signal
+import sys
+import time
 from logging import Logger
 from logging.handlers import RotatingFileHandler
+from typing import Optional
 
 import sentry_sdk
 from platformdirs import PlatformDirs
@@ -91,8 +95,19 @@ class CardAutomationServer:
             # is type hinted.
             self._resolver(PluginLoader, owner=owner, repo=repo)
 
+    @property
+    def is_alive(self) -> bool:
+        return self._worker_event_loop.is_alive
+
+    def stop(self):
+        self._worker_event_loop.stop()
+
+
+cas: Optional[CardAutomationServer] = None
+
 
 def main():
+    global cas
     logger = logging.getLogger("card_access")
     logger.setLevel(logging.INFO)
 
@@ -114,10 +129,18 @@ def main():
     logger.addHandler(file_handler)
 
     cas = CardAutomationServer(logger)
-    # TODO Keep thread alive
+    while cas.is_alive:
+        time.sleep(1)
 
 
-# TODO Support OS signal for termination
+def handle_interrupt(_, __):
+    global cas
+    if cas is not None:
+        cas.stop()
+    sys.exit(1)  # Exit with an error code so our calling function doesn't try to restart us
+
+
+signal.signal(signal.SIGINT, handle_interrupt)
 
 if __name__ == '__main__':
     main()

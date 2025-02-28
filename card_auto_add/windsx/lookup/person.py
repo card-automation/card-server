@@ -107,7 +107,6 @@ class _PersonSearchBase(abc.ABC):
 
         name_ids_result: Optional[set[int]] = None
 
-        # TODO test outer join on UdfSel where Combo is true?
         for udf_name, udf_text in self._udf_criteria.items():
             statement = base_statement \
                 .where(UDF.UdfNum == names_to_ids[udf_name]) \

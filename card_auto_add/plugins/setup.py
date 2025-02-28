@@ -62,7 +62,6 @@ class AutoDiscoverPlugins(PluginSetup):
         result = []
 
         for cls in self._plugin_classes:
-            # TODO Handle cannot resolve exceptions
             result.append(self._resolver.singleton(cls))
 
         return result

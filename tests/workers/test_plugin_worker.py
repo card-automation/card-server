@@ -10,7 +10,7 @@ from card_auto_add.plugins.interfaces import PluginStartup, PluginShutdown, Plug
 from card_auto_add.plugins.types import CardScan, CardScanEventType
 from card_auto_add.windsx.lookup.access_card import AccessCard, AccessCardLookup
 from card_auto_add.workers.events import AccessCardPushed, CardScanned
-from tests.conftest import PluginWorkerFactory
+from tests.conftest import PluginWorkerFactory, main_location_id
 
 
 class HasAssertableFlag:
@@ -67,6 +67,7 @@ class TestPluginWorker:
             scan_time=datetime.now(),
             device=0,
             event_type=CardScanEventType.ACCESS_GRANTED,
+            location_id=main_location_id
         )
         event = CardScanned(
             card_scan=card_scan
@@ -160,6 +161,7 @@ class TestPluginWorker:
             scan_time=datetime.now(),
             device=0,
             event_type=CardScanEventType.ACCESS_GRANTED,
+            location_id=main_location_id
         )
         event = CardScanned(card_scan)
         # Queue that event 5 times. It shouldn't matter what event it is, just that we've queued it faster than the

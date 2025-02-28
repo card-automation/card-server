@@ -33,9 +33,6 @@ class AccessCardLookup:
             .where(CARDS.LocGrp == self._lookup_info.location_group_id)
         ).all()
 
-        # TODO Handle len(valid_cards) > 1
-        #  (This shouldn't happen on the UI side, but I don't think we prevent it yet with this framework)
-
         if len(valid_cards) == 0:
             access_card = AccessCard(self._lookup_info, 0)
             access_card.card_number = card_number
