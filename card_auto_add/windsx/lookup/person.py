@@ -1,6 +1,6 @@
 import abc
 import enum
-from typing import Optional, Any, Sequence
+from typing import Optional, Any, Sequence, Union, Pattern
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -42,7 +42,7 @@ class _PersonSearchBase(abc.ABC):
         self._location_group_id: int = lookup_info.location_group_id
         self._session = Session(lookup_info.acs_engine)
         self._criteria: dict[_SearchCriteria, Any] = {}
-        self._udf_criteria: dict[str, str] = {}
+        self._udf_criteria: dict[str, Union[str, Pattern[str]]] = {}
 
     @abc.abstractmethod
     def _search_object(self) -> '_PersonSearchBuilder':
@@ -58,7 +58,7 @@ class _PersonSearchBase(abc.ABC):
 
         return search
 
-    def by_udf(self, udf_name: str, udf_text: str) -> '_PersonSearchBuilder':
+    def by_udf(self, udf_name: str, udf_text: Union[str, Pattern[str]]) -> '_PersonSearchBuilder':
         search: _PersonSearchBuilder = self._search_object()
 
         if _SearchCriteria.UDF not in search._criteria:
@@ -101,21 +101,29 @@ class _PersonSearchBase(abc.ABC):
 
             names_to_ids[udf_name] = valid_rows[0]
 
-        base_statement = select(NAMES.ID) \
+        base_statement = select(NAMES.ID, UDF.UdfText) \
             .join(UDF, UDF.NameID == NAMES.ID) \
             .where(UDF.LocGrp == self._location_group_id)
 
         name_ids_result: Optional[set[int]] = None
 
         for udf_name, udf_text in self._udf_criteria.items():
-            statement = base_statement \
-                .where(UDF.UdfNum == names_to_ids[udf_name]) \
-                .where(UDF.UdfText == udf_text)
+            statement = base_statement.where(UDF.UdfNum == names_to_ids[udf_name])
 
-            name_ids = self._session.scalars(statement).all()
+            if isinstance(udf_text, str):
+                statement = statement.where(UDF.UdfText == udf_text)
+
+            rows = self._session.execute(statement).all()
+
+            name_ids = set()
+            for row in rows:
+                if isinstance(udf_text, str):
+                    name_ids.add(row[0])  # We compared the string in the query search
+                elif udf_text.match(row[1]) is not None:
+                    name_ids.add(row[0])  # We compared the string with regex
 
             if name_ids_result is None:
-                name_ids_result = set(name_ids)
+                name_ids_result = name_ids
             else:
                 name_ids_result = name_ids_result.intersection(name_ids)
 

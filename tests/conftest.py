@@ -313,6 +313,8 @@ def table_udf(session: Session):
     session.add_all([
         UDF(LocGrp=location_group_id, NameID=101, UdfNum=1, UdfText="5000"),  # BobThe BuildingManager UDF ID
         UDF(LocGrp=location_group_id, NameID=101, UdfNum=2, UdfText="Apple"),  # BobThe BuildingManager UDF Fruit
+        UDF(LocGrp=location_group_id, NameID=110, UdfNum=1, UdfText="6000"),  # Fire Key UDF ID (Used for regex search)
+        UDF(LocGrp=location_group_id, NameID=201, UdfNum=1, UdfText="5001"),  # Ray Securitay UDF ID (Used for regex search)
 
         # name ids [101, 102] are returned UNLESS we correctly filter on the location group here in the UDF table.
         UDF(LocGrp=bad_location_group, NameID=102, UdfNum=1, UdfText="5000"),

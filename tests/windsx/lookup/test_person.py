@@ -1,3 +1,4 @@
+import re
 from unittest.mock import Mock
 
 import pytest
@@ -69,7 +70,7 @@ class TestPersonLookup:
         assert person.last_name == 'Securitay'
         assert person.company_id == 2
 
-        assert len(person.user_defined_fields) == 0
+        assert len(person.user_defined_fields) == 1
 
     def test_lookup_by_name(self, person_lookup: PersonLookup):
         people = person_lookup.by_name('BobThe', 'BuildingManager').find()
@@ -86,6 +87,16 @@ class TestPersonLookup:
 
         person = people[0]
         self._assert_bob_the_building_manager(person)
+
+    def test_lookup_by_udf_regex(self, person_lookup: PersonLookup):
+        people = person_lookup.by_udf("ID", re.compile("500\d")).find()
+
+        assert len(people) == 2
+
+        person = [x for x in people if x.id == 101][0]
+        self._assert_bob_the_building_manager(person)
+        person = [x for x in people if x.id == 201][0]
+        self._assert_ray_securitay(person)
 
     def test_lookup_by_udf_select(self, person_lookup: PersonLookup):
         people = person_lookup.by_udf("Fruit", "Apple").find()
