@@ -8,6 +8,7 @@ from typing import Optional
 
 import sentry_sdk
 from platformdirs import PlatformDirs
+from sentry_sdk import capture_exception
 
 from card_auto_add.config import Config
 from card_auto_add.ioc import Resolver
@@ -93,7 +94,10 @@ class CardAutomationServer:
             owner, repo = owner_repo.split("/")
             # Resolve the plugin loader to load the plugin. We only need to specify the owner and repo, everything else
             # is type hinted.
-            self._resolver(PluginLoader, owner=owner, repo=repo)
+            try:
+                self._resolver(PluginLoader, owner=owner, repo=repo)
+            except BaseException as ex:
+                capture_exception(ex)
 
     @property
     def is_alive(self) -> bool:
