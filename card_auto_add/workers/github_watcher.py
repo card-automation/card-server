@@ -7,7 +7,7 @@ import zipfile
 from datetime import timedelta
 from importlib.resources import as_file
 from pathlib import Path
-from typing import Union, TypedDict, Required, Optional
+from typing import Union, TypedDict, Required, Optional, Tuple
 
 from githubkit import GitHub, AppAuthStrategy, AppInstallationAuthStrategy
 from githubkit.exception import RequestFailed
@@ -84,11 +84,14 @@ class GitHubWatcher(EventsWorker[_Events]):
 
         self._github_installs: dict[int, GitHub] = {}
 
+        for install in self._known_installs:
+            install_auth = AppInstallationAuthStrategy(
+                self._config.github.app_id, self.__private_key, install["install_id"]
+            )
+            self._github_installs[install["install_id"]] = GitHub(install_auth)
+
         self._self_install_id = config.github.self_installation_id
-        install_auth = AppInstallationAuthStrategy(
-            self._config.github.app_id, self.__private_key, self._self_install_id
-        )
-        self._github_main: GitHub = GitHub(install_auth)
+        self._github_main: GitHub = self._github_installs[self._self_install_id]
         my_install: _AppInstall = [x for x in self._known_installs if x["install_id"] == self._self_install_id][0]
         self._known_installs.remove(my_install)  # We handle the main installation differently
         self._main_owner = my_install["owner"]
@@ -314,23 +317,24 @@ class GitHubWatcher(EventsWorker[_Events]):
             commit=latest_commit.sha
         ))
 
-    def _handle_update_available(self, event: UpdateAvailable):
-        print(f"Update available for {event.owner}/{event.repo}")
-        deploy: Optional[_HasCommitVersions] = None
-        github: Optional[GitHub] = None
-        if event.owner == self._main_owner and event.repo == self._main_repo:
-            deploy = self._config.deploy
-            github = self._github_main
+    def _get_deploy_and_github(self, owner: str, repo: str) -> Tuple[Optional[_HasCommitVersions], Optional[GitHub]]:
+        if owner == self._main_owner and repo == self._main_repo:
+            return self._config.deploy, self._github_main
         else:
             for install in self._known_installs:
-                if event.owner != install["owner"]:
+                if owner != install["owner"]:
                     continue
 
-                if event.repo not in install["repos"]:
+                if repo not in install["repos"]:
                     continue
 
-                deploy = self._config.plugins[event.owner, event.repo]
-                github = self._github_installs[install["install_id"]]
+                return self._config.plugins[owner, repo], self._github_installs[install["install_id"]]
+
+        return None, None
+
+    def _handle_update_available(self, event: UpdateAvailable):
+        print(f"Update available for {event.owner}/{event.repo}")
+        deploy, github = self._get_deploy_and_github(event.owner, event.repo)
 
         if deploy is None or github is None:
             raise Exception("Couldn't find required pieces for update")
@@ -456,6 +460,18 @@ class GitHubWatcher(EventsWorker[_Events]):
             commit=self._config.deploy.commit,
             environment=self._config.deploy.environment
         )
+
+        for owner_repo, plugin in self._config.plugins.items():
+            owner, repo = owner_repo.split("/")
+            _, github = self._get_deploy_and_github(owner, repo)
+
+            self._complete_deployment_for_repo(
+                github=github,
+                repo_owner=owner,
+                repo_name=repo,
+                commit=plugin.commit,
+                environment=self._config.deploy.environment
+            )
 
     @staticmethod
     def _complete_deployment_for_repo(github: GitHub,

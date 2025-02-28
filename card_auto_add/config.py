@@ -89,10 +89,13 @@ class _PluginsConfig(ConfigHolder):
                  config: TomlConfigType,
                  dirs: PlatformDirs):
         super().__init__(config)
-        self._plugins: dict[str, _PluginConfig] = {}
-
         self._data_root = dirs.user_data_path if sys.platform == "darwin" else dirs.site_data_path
         self._data_root.mkdir(parents=True, exist_ok=True)
+
+        self._plugins: dict[str, _PluginConfig] = {
+            key: _PluginConfig(value, self._data_root / key)
+            for (key, value) in config.items()
+        }
 
     def keys(self):
         return self._plugins.keys()
@@ -139,7 +142,9 @@ class Config(BaseConfig):
         super().__init__(ConfigPath(config_path))
 
     def _manual_config_setup(self):
-        self.plugins = _PluginsConfig(self._config, self._platformdirs)
+        if "plugins" not in self._config:
+            self._config["plugins"] = tomlkit.table()
+        self.plugins = _PluginsConfig(self._config["plugins"], self._platformdirs)
 
     deploy: _DeployConfig
     windsx: _WinDSXConfig
