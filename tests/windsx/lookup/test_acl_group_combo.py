@@ -5,8 +5,8 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import AclGrpCombo
-from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupNameNotInCombo, \
+from card_automation_server.windsx.db.models import AclGrpCombo
+from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupNameNotInCombo, \
     AclGroupNameNotInDatabase, AclGroupComboLookup
 from tests.conftest import acs_data_engine
 

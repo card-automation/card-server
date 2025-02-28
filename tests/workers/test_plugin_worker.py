@@ -5,11 +5,11 @@ from typing import Optional
 
 import pytest
 
-from card_auto_add.plugins.interfaces import PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop, \
+from card_automation_server.plugins.interfaces import PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop, \
     PluginCardDataPushed
-from card_auto_add.plugins.types import CardScan, CardScanEventType
-from card_auto_add.windsx.lookup.access_card import AccessCard, AccessCardLookup
-from card_auto_add.workers.events import AccessCardPushed, CardScanned
+from card_automation_server.plugins.types import CardScan, CardScanEventType
+from card_automation_server.windsx.lookup.access_card import AccessCard, AccessCardLookup
+from card_automation_server.workers.events import AccessCardPushed, CardScanned
 from tests.conftest import PluginWorkerFactory, main_location_id
 
 

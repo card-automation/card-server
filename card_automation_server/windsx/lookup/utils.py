@@ -3,7 +3,7 @@ from typing import Optional, Callable, Any
 
 from sqlalchemy import Engine
 
-from card_auto_add.windsx.engines import AcsEngine
+from card_automation_server.windsx.engines import AcsEngine
 
 
 class DbModel(abc.ABC):

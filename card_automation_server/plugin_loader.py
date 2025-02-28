@@ -4,20 +4,20 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from card_auto_add.config import Config
-from card_auto_add.ioc import Resolver
-from card_auto_add.plugins.config import ConfigPath
-from card_auto_add.plugins.error_handling import ErrorHandler
-from card_auto_add.plugins.interfaces import Plugin
-from card_auto_add.plugins.setup import PluginSetup, HasErrorHandler
-from card_auto_add.windsx.engines import AcsEngine, LogEngine
-from card_auto_add.windsx.lookup.access_card import AccessCardLookup
-from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
-from card_auto_add.windsx.lookup.door_lookup import DoorLookup
-from card_auto_add.windsx.lookup.person import PersonLookup
-from card_auto_add.windsx.lookup.utils import LookupInfo
-from card_auto_add.workers.plugin_worker import PluginWorker
-from card_auto_add.workers.worker_event_loop import WorkerEventLoop
+from card_automation_server.config import Config
+from card_automation_server.ioc import Resolver
+from card_automation_server.plugins.config import ConfigPath
+from card_automation_server.plugins.error_handling import ErrorHandler
+from card_automation_server.plugins.interfaces import Plugin
+from card_automation_server.plugins.setup import PluginSetup, HasErrorHandler
+from card_automation_server.windsx.engines import AcsEngine, LogEngine
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup
+from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_automation_server.windsx.lookup.door_lookup import DoorLookup
+from card_automation_server.windsx.lookup.person import PersonLookup
+from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.workers.plugin_worker import PluginWorker
+from card_automation_server.workers.worker_event_loop import WorkerEventLoop
 
 
 class PluginLoader:
@@ -111,7 +111,7 @@ class PluginLoader:
                         continue  # Shouldn't happen, but if it does, we didn't get a plugin back
 
                     for parent in plugin.__class__.__mro__:
-                        if not parent.__module__.startswith('card_auto_add.plugins.interfaces'):
+                        if not parent.__module__.startswith('card_automation_server.plugins.interfaces'):
                             continue
 
                         if Plugin == parent:

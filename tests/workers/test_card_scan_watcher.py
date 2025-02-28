@@ -4,10 +4,10 @@ import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from card_auto_add.plugins.types import CardScanEventType
-from card_auto_add.windsx.db.models import EvnLog
-from card_auto_add.workers.card_scan_watcher import CardScanWatcher
-from card_auto_add.workers.events import CardScanned, LogDatabaseUpdated
+from card_automation_server.plugins.types import CardScanEventType
+from card_automation_server.windsx.db.models import EvnLog
+from card_automation_server.workers.card_scan_watcher import CardScanWatcher
+from card_automation_server.workers.events import CardScanned, LogDatabaseUpdated
 from tests.conftest import main_location_id
 
 

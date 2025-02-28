@@ -4,11 +4,11 @@ from typing import Union, Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import LocCards, LOC
-from card_auto_add.windsx.lookup.access_card import AccessCard
-from card_auto_add.windsx.lookup.utils import LookupInfo
-from card_auto_add.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, LocCardUpdated
-from card_auto_add.workers.utils import EventsWorker
+from card_automation_server.windsx.db.models import LocCards, LOC
+from card_automation_server.windsx.lookup.access_card import AccessCard
+from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, LocCardUpdated
+from card_automation_server.workers.utils import EventsWorker
 
 # What events does this worker accept? Used for type hinting
 _CardPushedWatcherEvents = Union[

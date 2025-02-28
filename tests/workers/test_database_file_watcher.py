@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from card_auto_add.workers.database_file_watcher import DatabaseFileWatcher
-from card_auto_add.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
+from card_automation_server.workers.database_file_watcher import DatabaseFileWatcher
+from card_automation_server.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
 
 
 @pytest.fixture

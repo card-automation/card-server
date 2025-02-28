@@ -1,10 +1,10 @@
 import time
 from typing import Union
 
-from card_auto_add.plugins.interfaces import Plugin, PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop, \
+from card_automation_server.plugins.interfaces import Plugin, PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop, \
     PluginCardDataPushed
-from card_auto_add.workers.events import AccessCardPushed, CardScanned
-from card_auto_add.workers.utils import EventsWorker
+from card_automation_server.workers.events import AccessCardPushed, CardScanned
+from card_automation_server.workers.utils import EventsWorker
 
 _PluginEvent = Union[
     CardScanned,

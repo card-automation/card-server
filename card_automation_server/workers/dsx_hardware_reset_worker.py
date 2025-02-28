@@ -5,12 +5,12 @@ import requests
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from card_auto_add.config import Config
-from card_auto_add.data_signing import DataSigning
-from card_auto_add.windsx.db.models import LOC
-from card_auto_add.windsx.engines import AcsEngine
-from card_auto_add.workers.events import AcsDatabaseUpdated, CommServerRestartRequested
-from card_auto_add.workers.utils import EventsWorker
+from card_automation_server.config import Config
+from card_automation_server.data_signing import DataSigning
+from card_automation_server.windsx.db.models import LOC
+from card_automation_server.windsx.engines import AcsEngine
+from card_automation_server.workers.events import AcsDatabaseUpdated, CommServerRestartRequested
+from card_automation_server.workers.utils import EventsWorker
 
 _Events = [
     AcsDatabaseUpdated

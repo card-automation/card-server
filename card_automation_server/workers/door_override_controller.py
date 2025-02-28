@@ -3,8 +3,8 @@ import time
 from datetime import datetime, timedelta
 from typing import Union
 
-from card_auto_add.workers.events import DoorStateUpdate, DoorState
-from card_auto_add.workers.utils import EventsWorker
+from card_automation_server.workers.events import DoorStateUpdate, DoorState
+from card_automation_server.workers.utils import EventsWorker
 
 _Events = Union[
     DoorStateUpdate

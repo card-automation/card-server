@@ -1,8 +1,8 @@
 from unittest.mock import Mock
 
-from card_auto_add.windsx.lookup.door_lookup import DoorLookup, Door
-from card_auto_add.windsx.lookup.utils import LookupInfo
-from card_auto_add.workers.events import DoorStateUpdate, DoorState
+from card_automation_server.windsx.lookup.door_lookup import DoorLookup, Door
+from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.workers.events import DoorStateUpdate, DoorState
 from tests.conftest import main_location_id, annex_location_id
 
 

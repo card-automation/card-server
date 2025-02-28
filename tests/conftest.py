@@ -8,16 +8,16 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
-from card_auto_add.ioc import Resolver
-from card_auto_add.plugins.interfaces import Plugin
-from card_auto_add.plugins.types import CardScanEventType
-from card_auto_add.windsx.db.engine_factory import EngineFactory
-from card_auto_add.windsx.db.models import *
-from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard
-from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
-from card_auto_add.windsx.lookup.person import PersonLookup
-from card_auto_add.windsx.lookup.utils import LookupInfo
-from card_auto_add.workers.plugin_worker import PluginWorker
+from card_automation_server.ioc import Resolver
+from card_automation_server.plugins.interfaces import Plugin
+from card_automation_server.plugins.types import CardScanEventType
+from card_automation_server.windsx.db.engine_factory import EngineFactory
+from card_automation_server.windsx.db.models import *
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard
+from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_automation_server.windsx.lookup.person import PersonLookup
+from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.workers.plugin_worker import PluginWorker
 
 location_group_id = 3
 main_location_id = 3

@@ -2,7 +2,7 @@ from typing import NewType
 
 import pytest
 
-from card_auto_add.ioc import Resolver, DuplicateArgOfSameType, UnknownArgument, UnknownKeywordArgument, \
+from card_automation_server.ioc import Resolver, DuplicateArgOfSameType, UnknownArgument, UnknownKeywordArgument, \
     UnboundTypeRequested
 
 

@@ -3,8 +3,8 @@ import enum
 from dataclasses import dataclass
 from typing import Optional
 
-from card_auto_add.plugins.types import CardScan
-from card_auto_add.windsx.lookup.access_card import AccessCard
+from card_automation_server.plugins.types import CardScan
+from card_automation_server.windsx.lookup.access_card import AccessCard
 
 
 class WorkerEvent(abc.ABC):

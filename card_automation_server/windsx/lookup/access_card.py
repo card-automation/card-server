@@ -4,10 +4,10 @@ from typing import Optional, Union, Callable, Any
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import CARDS, LOC, AclGrpName, AclGrpCombo, AclGrp, DGRP, ACL, LocCards
-from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboSet
-from card_auto_add.windsx.lookup.person import Person
-from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel
+from card_automation_server.windsx.db.models import CARDS, LOC, AclGrpName, AclGrpCombo, AclGrp, DGRP, ACL, LocCards
+from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet
+from card_automation_server.windsx.lookup.person import Person
+from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
 
 
 class InvalidPersonForAccessCard(Exception):

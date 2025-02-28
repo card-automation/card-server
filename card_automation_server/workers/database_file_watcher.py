@@ -4,8 +4,8 @@ from typing import Optional
 from watchdog.events import FileSystemEventHandler, FileSystemEvent, FileModifiedEvent
 from watchdog.observers import Observer
 
-from card_auto_add.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
-from card_auto_add.workers.utils import Worker
+from card_automation_server.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
+from card_automation_server.workers.utils import Worker
 
 
 class DatabaseFileWatcher(Worker, FileSystemEventHandler):

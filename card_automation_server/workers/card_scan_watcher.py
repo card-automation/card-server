@@ -1,11 +1,11 @@
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
-from card_auto_add.plugins.types import CardScanEventType, CardScan
-from card_auto_add.windsx.db.models import EvnLog
-from card_auto_add.windsx.engines import LogEngine
-from card_auto_add.workers.events import LogDatabaseUpdated, CardScanned
-from card_auto_add.workers.utils import EventsWorker
+from card_automation_server.plugins.types import CardScanEventType, CardScan
+from card_automation_server.windsx.db.models import EvnLog
+from card_automation_server.windsx.engines import LogEngine
+from card_automation_server.workers.events import LogDatabaseUpdated, CardScanned
+from card_automation_server.workers.utils import EventsWorker
 
 _Events = [
     LogDatabaseUpdated

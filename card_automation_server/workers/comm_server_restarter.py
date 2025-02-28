@@ -7,9 +7,9 @@ from typing import Optional
 import psutil
 from sentry_sdk import capture_exception
 
-from card_auto_add.config import Config
-from card_auto_add.workers.events import CommServerRestartRequested
-from card_auto_add.workers.utils import EventsWorker
+from card_automation_server.config import Config
+from card_automation_server.workers.events import CommServerRestartRequested
+from card_automation_server.workers.utils import EventsWorker
 
 _Events = [
     CommServerRestartRequested

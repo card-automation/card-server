@@ -1,7 +1,7 @@
 import abc
 
-from card_auto_add.plugins.types import CardScan
-from card_auto_add.windsx.lookup.access_card import AccessCard
+from card_automation_server.plugins.types import CardScan
+from card_automation_server.windsx.lookup.access_card import AccessCard
 
 
 class Plugin(abc.ABC):

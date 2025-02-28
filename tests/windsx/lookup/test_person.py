@@ -5,10 +5,10 @@ import pytest
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import UdfName
-from card_auto_add.windsx.lookup.person import PersonLookup, Person, InvalidUdfName, MissingRequiredUserDefinedField, \
+from card_automation_server.windsx.db.models import UdfName
+from card_automation_server.windsx.lookup.person import PersonLookup, Person, InvalidUdfName, MissingRequiredUserDefinedField, \
     InvalidUdfSelection
-from card_auto_add.windsx.lookup.utils import LookupInfo
+from card_automation_server.windsx.lookup.utils import LookupInfo
 from tests.conftest import location_group_id
 
 

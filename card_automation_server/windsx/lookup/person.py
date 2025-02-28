@@ -5,8 +5,8 @@ from typing import Optional, Any, Sequence, Union, Pattern
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import NAMES, UDF, UdfName, CARDS, UdfSel
-from card_auto_add.windsx.lookup.utils import DbModel, LookupInfo
+from card_automation_server.windsx.db.models import NAMES, UDF, UdfName, CARDS, UdfSel
+from card_automation_server.windsx.lookup.utils import DbModel, LookupInfo
 
 
 class InvalidUdfName(Exception):

@@ -13,9 +13,9 @@ from githubkit import GitHub, AppAuthStrategy, AppInstallationAuthStrategy
 from githubkit.exception import RequestFailed
 from githubkit.versions.v2022_11_28.models import Installation, Repository, PullRequestSimple, Commit, Deployment
 
-from card_auto_add.config import Config, _HasCommitVersions
-from card_auto_add.workers.events import WorkerEvent, ApplicationRestartNeeded
-from card_auto_add.workers.utils import EventsWorker
+from card_automation_server.config import Config, _HasCommitVersions
+from card_automation_server.workers.events import WorkerEvent, ApplicationRestartNeeded
+from card_automation_server.workers.utils import EventsWorker
 
 
 # These worker events are only for this worker, to make some of the threading logic easier
@@ -67,7 +67,7 @@ class GitHubWatcher(EventsWorker[_Events]):
         super().__init__()
         self._config = config
 
-        self._known_installs_file = importlib.resources.files('card_auto_add').joinpath('known_github_installs.json')
+        self._known_installs_file = importlib.resources.files('card_automation_server').joinpath('known_github_installs.json')
 
         self._known_installs: list[_AppInstall] = json.loads(self._known_installs_file.read_text())
         self._rejected_installs: set[int] = set()

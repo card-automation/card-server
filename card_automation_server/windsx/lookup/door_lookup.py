@@ -3,9 +3,9 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import DEV, LOC
-from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel
-from card_auto_add.workers.events import DoorStateUpdate, DoorState
+from card_automation_server.windsx.db.models import DEV, LOC
+from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
+from card_automation_server.workers.events import DoorStateUpdate, DoorState
 
 
 class DoorLookup:

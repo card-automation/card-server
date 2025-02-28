@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 import tomlkit
 from platformdirs import PlatformDirs
 
-from card_auto_add.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath, TomlConfigType
+from card_automation_server.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath, TomlConfigType
 
 
 class _HasCommitVersions(ConfigHolder):

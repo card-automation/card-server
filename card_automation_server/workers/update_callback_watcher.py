@@ -1,9 +1,9 @@
 from typing import Callable, Any, Optional
 
-from card_auto_add.windsx.db.models import LocCards
-from card_auto_add.windsx.lookup.access_card import AccessCard
-from card_auto_add.workers.events import LocCardUpdated, AccessCardUpdated
-from card_auto_add.workers.utils import Worker
+from card_automation_server.windsx.db.models import LocCards
+from card_automation_server.windsx.lookup.access_card import AccessCard
+from card_automation_server.workers.events import LocCardUpdated, AccessCardUpdated
+from card_automation_server.workers.utils import Worker
 
 
 class UpdateCallbackWatcher(Worker):

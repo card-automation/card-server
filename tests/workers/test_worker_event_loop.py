@@ -3,9 +3,9 @@ from typing import Union
 
 import pytest
 
-from card_auto_add.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated, ApplicationRestartNeeded
-from card_auto_add.workers.utils import ThreadedWorker, EventsWorker
-from card_auto_add.workers.worker_event_loop import WorkerEventLoop
+from card_automation_server.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated, ApplicationRestartNeeded
+from card_automation_server.workers.utils import ThreadedWorker, EventsWorker
+from card_automation_server.workers.worker_event_loop import WorkerEventLoop
 
 
 class EmittingWorker(ThreadedWorker[None]):

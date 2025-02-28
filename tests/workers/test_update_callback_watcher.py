@@ -1,12 +1,12 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import LocCards
-from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard
-from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup, AclGroupComboSet
-from card_auto_add.windsx.lookup.person import PersonLookup
-from card_auto_add.workers.events import LocCardUpdated, AccessCardUpdated
-from card_auto_add.workers.update_callback_watcher import UpdateCallbackWatcher
+from card_automation_server.windsx.db.models import LocCards
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard
+from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup, AclGroupComboSet
+from card_automation_server.windsx.lookup.person import PersonLookup
+from card_automation_server.workers.events import LocCardUpdated, AccessCardUpdated
+from card_automation_server.workers.update_callback_watcher import UpdateCallbackWatcher
 from tests.conftest import main_location_id
 
 

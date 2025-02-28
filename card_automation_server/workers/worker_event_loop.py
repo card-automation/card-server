@@ -3,8 +3,8 @@ import threading
 from queue import Empty
 from typing import Any
 
-from card_auto_add.workers.events import WorkerEvent, ApplicationRestartNeeded
-from card_auto_add.workers.utils import Worker, EventsWorker
+from card_automation_server.workers.events import WorkerEvent, ApplicationRestartNeeded
+from card_automation_server.workers.utils import Worker, EventsWorker
 
 
 class _WorkerMonitorThread:

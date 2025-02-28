@@ -10,23 +10,23 @@ import sentry_sdk
 from platformdirs import PlatformDirs
 from sentry_sdk import capture_exception
 
-from card_auto_add.config import Config
-from card_auto_add.ioc import Resolver
-from card_auto_add.plugin_loader import PluginLoader
-from card_auto_add.windsx.db.engine_factory import EngineFactory
-from card_auto_add.windsx.engines import AcsEngine, LogEngine
-from card_auto_add.windsx.lookup.access_card import AccessCardLookup
-from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
-from card_auto_add.windsx.lookup.person import PersonLookup
-from card_auto_add.windsx.lookup.utils import LookupInfo
-from card_auto_add.workers.card_pushed_watcher import CardPushedWatcher
-from card_auto_add.workers.card_scan_watcher import CardScanWatcher
-from card_auto_add.workers.comm_server_restarter import CommServerRestarter
-from card_auto_add.workers.database_file_watcher import DatabaseFileWatcher
-from card_auto_add.workers.door_override_controller import DoorOverrideController
-from card_auto_add.workers.dsx_hardware_reset_worker import DSXHardwareResetWorker
-from card_auto_add.workers.update_callback_watcher import UpdateCallbackWatcher
-from card_auto_add.workers.worker_event_loop import WorkerEventLoop
+from card_automation_server.config import Config
+from card_automation_server.ioc import Resolver
+from card_automation_server.plugin_loader import PluginLoader
+from card_automation_server.windsx.db.engine_factory import EngineFactory
+from card_automation_server.windsx.engines import AcsEngine, LogEngine
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup
+from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_automation_server.windsx.lookup.person import PersonLookup
+from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.workers.card_pushed_watcher import CardPushedWatcher
+from card_automation_server.workers.card_scan_watcher import CardScanWatcher
+from card_automation_server.workers.comm_server_restarter import CommServerRestarter
+from card_automation_server.workers.database_file_watcher import DatabaseFileWatcher
+from card_automation_server.workers.door_override_controller import DoorOverrideController
+from card_automation_server.workers.dsx_hardware_reset_worker import DSXHardwareResetWorker
+from card_automation_server.workers.update_callback_watcher import UpdateCallbackWatcher
+from card_automation_server.workers.worker_event_loop import WorkerEventLoop
 
 
 class CardAutomationServer:

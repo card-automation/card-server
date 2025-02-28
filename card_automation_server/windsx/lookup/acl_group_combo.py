@@ -4,8 +4,8 @@ from typing import Optional, Union, Iterable, Dict, Collection, List
 from sqlalchemy import select, distinct
 from sqlalchemy.orm import Session
 
-from card_auto_add.windsx.db.models import AclGrpCombo, AclGrpName
-from card_auto_add.windsx.lookup.utils import LookupInfo, DbModel
+from card_automation_server.windsx.db.models import AclGrpCombo, AclGrpName
+from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
 
 StringOrFrozenSet = Union[str, frozenset[str], Iterable[str]]
 

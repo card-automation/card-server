@@ -6,9 +6,9 @@ from abc import ABC
 from pathlib import Path
 from typing import Optional
 
-from card_auto_add.ioc import Resolver
-from card_auto_add.plugins.error_handling import ErrorHandler
-from card_auto_add.plugins.interfaces import Plugin
+from card_automation_server.ioc import Resolver
+from card_automation_server.plugins.error_handling import ErrorHandler
+from card_automation_server.plugins.interfaces import Plugin
 
 
 class PluginSetup(abc.ABC):

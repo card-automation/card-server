@@ -6,10 +6,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.orm import Session, InstrumentedAttribute, Mapped
 
-from card_auto_add.windsx.db.models import CARDS, DGRP, ACL, LocCards, LOC
-from card_auto_add.windsx.lookup.access_card import AccessCardLookup, AccessCard, InvalidPersonForAccessCard
-from card_auto_add.windsx.lookup.person import Person, PersonLookup
-from card_auto_add.windsx.lookup.utils import LookupInfo
+from card_automation_server.windsx.db.models import CARDS, DGRP, ACL, LocCards, LOC
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, InvalidPersonForAccessCard
+from card_automation_server.windsx.lookup.person import Person, PersonLookup
+from card_automation_server.windsx.lookup.utils import LookupInfo
 from tests.conftest import main_location_id, annex_location_id
 
 _acl_name_master_access_level = "Master Access Level"
