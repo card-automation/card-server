@@ -3,7 +3,7 @@ import threading
 from queue import Empty
 from typing import Any
 
-from card_auto_add.workers.events import WorkerEvent
+from card_auto_add.workers.events import WorkerEvent, ApplicationRestartNeeded
 from card_auto_add.workers.utils import Worker, EventsWorker
 
 
@@ -76,6 +76,11 @@ class WorkerEventLoop(EventsWorker[Any]):
             worker_thread.stop_running.set()
 
     def _handle_event(self, event: Any):
+        if event.__class__ == ApplicationRestartNeeded:
+            print("Restarting app")
+            self.stop()
+            return
+
         if event.__class__ not in self._event_to_workers:
             return
 

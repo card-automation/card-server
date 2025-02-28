@@ -3,7 +3,7 @@ from typing import Union
 
 import pytest
 
-from card_auto_add.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
+from card_auto_add.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated, ApplicationRestartNeeded
 from card_auto_add.workers.utils import ThreadedWorker, EventsWorker
 from card_auto_add.workers.worker_event_loop import WorkerEventLoop
 
@@ -108,3 +108,13 @@ class TestWorkerEventLoop:
 
         assert accepting.called.wait(1)
         assert isinstance(accepting.sent_event, AcsDatabaseUpdated)
+
+    @pytest.mark.long
+    def test_getting_restart_event_kills_event_loop(self, event_loop: WorkerEventLoop):
+        assert event_loop.is_alive
+
+        event_loop.event(ApplicationRestartNeeded())
+
+        assert event_loop._wait_on_events(3)
+
+        assert not event_loop.is_alive

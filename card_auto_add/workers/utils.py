@@ -34,6 +34,10 @@ class ThreadedWorker(Generic[T], Worker):
 
         self._thread = threading.Thread(target=self._run, daemon=True)
 
+    @property
+    def is_alive(self) -> bool:
+        return self._thread.is_alive()
+
     def start(self):
         if self._thread.is_alive():
             return  # Can't start an already started thread
@@ -47,12 +51,16 @@ class ThreadedWorker(Generic[T], Worker):
         self._keep_running.set()
         self._wake_event.set()
 
-        self._thread.join(timeout)
         try:
-            if self._thread.is_alive():
-                # Thread timed out
-                # TODO Handle this better as it's not necessarily the worker thread's fault that the timeout occurred
-                raise Exception("Plugin worker thread timed out")
+            # Only call join if we're stopping it from a different thread. This has the caveat of no exceptions being
+            # sent if a thread stops itself, but the only thread that does that is the worker event loop.
+            if self._thread.ident != threading.current_thread().ident:
+                self._thread.join(timeout)
+
+                if self._thread.is_alive():
+                    # Thread timed out
+                    # TODO Handle this better as it's not necessarily the worker thread's fault that the timeout occurred
+                    raise Exception("Worker thread timed out")
         finally:
             self._cleanup()
 
