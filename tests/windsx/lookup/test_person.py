@@ -72,6 +72,11 @@ class TestPersonLookup:
 
         assert len(person.user_defined_fields) == 1
 
+    def test_lookup_by_id(self, person_lookup: PersonLookup):
+        person = person_lookup.by_id(101)
+
+        self._assert_bob_the_building_manager(person)
+
     def test_lookup_by_name(self, person_lookup: PersonLookup):
         people = person_lookup.by_name('BobThe', 'BuildingManager').find()
 

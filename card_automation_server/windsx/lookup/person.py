@@ -172,6 +172,9 @@ class PersonLookup(_PersonSearchBase):
     def new(self) -> 'Person':
         return Person(self._lookup_info, 0)
 
+    def by_id(self, name_id: int) -> 'Person':
+        return Person(self._lookup_info, name_id)
+
 
 class Person(DbModel):
     def __init__(self,
