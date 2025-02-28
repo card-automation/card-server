@@ -2,9 +2,7 @@ import base64
 import importlib.resources
 import io
 import json
-import tempfile
 import threading
-import time
 import zipfile
 from datetime import timedelta
 from importlib.resources import as_file
@@ -30,9 +28,22 @@ class NewGitHubInstallation(WorkerEvent):
         return self._install_id
 
 
-class ApplicationUpdateAvailable(WorkerEvent):
-    def __init__(self, commit: str):
+class UpdateAvailable(WorkerEvent):
+    def __init__(self,
+                 owner: str,
+                 repo: str,
+                 commit: str):
+        self._owner = owner
+        self._repo = repo
         self._commit = commit
+
+    @property
+    def owner(self) -> str:
+        return self._owner
+
+    @property
+    def repo(self) -> str:
+        return self._repo
 
     @property
     def commit(self) -> str:
@@ -41,7 +52,7 @@ class ApplicationUpdateAvailable(WorkerEvent):
 
 _Events = Union[
     NewGitHubInstallation,
-    ApplicationUpdateAvailable
+    UpdateAvailable
 ]
 
 
@@ -72,40 +83,51 @@ class GitHubWatcher(EventsWorker[_Events]):
         self._github_app: GitHub = GitHub(app_auth)
 
         self._github_installs: dict[int, GitHub] = {}
-        self._install_owners: dict[int, str] = {}
 
         self._self_install_id = config.github.self_installation_id
         install_auth = AppInstallationAuthStrategy(
             self._config.github.app_id, self.__private_key, self._self_install_id
         )
-        self._github_self: GitHub = GitHub(install_auth)
+        self._github_main: GitHub = GitHub(install_auth)
         my_install: _AppInstall = [x for x in self._known_installs if x["install_id"] == self._self_install_id][0]
         self._known_installs.remove(my_install)  # We handle the main installation differently
-        self._self_owner = my_install["owner"]
-        self._self_repo = my_install["repos"][0]
-        self._self_default_branch = self._github_self.rest.repos.get(self._self_owner,
-                                                                     self._self_repo).parsed_data.default_branch
+        self._main_owner = my_install["owner"]
+        self._main_repo = my_install["repos"][0]
+        self._main_default_branch = self._github_main.rest.repos.get(self._main_owner, self._main_repo).parsed_data \
+            .default_branch
+
+        need_to_write_config = False
+        for install in self._known_installs:
+            owner = install["owner"]
+            for repo in install["repos"]:
+                item = (owner, repo)
+                if item not in self._config.plugins:
+                    _ = self._config.plugins[item]  # Fetching it creates it
+                    need_to_write_config = True
+
+        if need_to_write_config:
+            # Since we had to write the configuration due to a new plugin, we should expect that plugin to be downloaded
+            # and cause an application restart to occur. We can't do it here because the initial code hasn't been
+            # downloaded yet.
+            self._config.write()
 
         self._deployment_in_progress: threading.Event = threading.Event()
 
-        self._complete_application_deployments()
+        self._complete_deployments()
 
         self._call_every(timedelta(minutes=1), self._check_for_new_installations)
-        self._call_every(timedelta(minutes=1), self._check_for_app_updates)
+        self._call_every(timedelta(minutes=1), self._check_for_updates)
 
     def _handle_event(self, event: _Events):
         if isinstance(event, NewGitHubInstallation):
             self._handle_new_github_installation(event)
 
-        if isinstance(event, ApplicationUpdateAvailable):
-            self._handle_application_update_available(event)
+        if isinstance(event, UpdateAvailable):
+            self._handle_update_available(event)
 
     def _check_for_new_installations(self) -> None:
         install: Installation
         for install in self._github_app.paginate(self._github_app.rest.apps.list_installations):
-            if install.id not in self._install_owners:
-                self._install_owners[install.id] = install.account.login
-
             if install.id == self._self_install_id:
                 # This is the main application, ignore it
                 continue
@@ -133,11 +155,11 @@ class GitHubWatcher(EventsWorker[_Events]):
         branch_name = f"install-{event.install_id}"
 
         pr: PullRequestSimple
-        for pr in self._github_self.rest.pulls.list(
-                owner=self._self_owner,
-                repo=self._self_repo,
+        for pr in self._github_main.rest.pulls.list(
+                owner=self._main_owner,
+                repo=self._main_repo,
                 state="all",
-                head=f"{self._self_owner}:{branch_name}"
+                head=f"{self._main_owner}:{branch_name}"
         ).parsed_data:
             if pr.state == "open":
                 # Nothing to do here. This does mean we'll get the event every loop, but that's perfectly fine.
@@ -152,26 +174,29 @@ class GitHubWatcher(EventsWorker[_Events]):
         # Let's look up all the repos we have access to. We need it both for the PR and potentially the json file update
         gh: GitHub = self._github_installs[event.install_id]
 
+        owner_login: Optional[str] = None
         plugin_repos: list[str] = []
         repo: Repository
         for repo in gh.paginate(
                 gh.rest.apps.list_repos_accessible_to_installation,
                 map_func=lambda r: r.parsed_data.repositories
         ):
+            if owner_login is None:
+                owner_login = repo.owner.login
             plugin_repos.append(repo.name)
 
         # Let's go find an existing branch and delete it if it's there
         try:
             # Test to see if the branch exists. Will throw a 404 if it doesn't and continue on if it does.
-            self._github_self.rest.repos.get_branch(
-                owner=self._self_owner,
-                repo=self._self_repo,
+            self._github_main.rest.repos.get_branch(
+                owner=self._main_owner,
+                repo=self._main_repo,
                 branch=branch_name
             )
 
-            self._github_self.rest.git.delete_ref(
-                owner=self._self_owner,
-                repo=self._self_repo,
+            self._github_main.rest.git.delete_ref(
+                owner=self._main_owner,
+                repo=self._main_repo,
                 ref=f"heads/{branch_name}"
             )
         except RequestFailed as ex:
@@ -179,9 +204,9 @@ class GitHubWatcher(EventsWorker[_Events]):
                 raise  # We expect not to find it, we don't expect to have any other issues
 
         # The branch shouldn't exist now, so let's create it
-        self._github_self.rest.git.create_ref(
-            owner=self._self_owner,
-            repo=self._self_repo,
+        self._github_main.rest.git.create_ref(
+            owner=self._main_owner,
+            repo=self._main_repo,
             data={
                 "ref": f"refs/heads/{branch_name}",
                 # This might not match our latest commit if we push an update but this runs before it's deployed.
@@ -191,13 +216,12 @@ class GitHubWatcher(EventsWorker[_Events]):
             }
         )
 
-        # Read it from the file to guarantee its contents, since we mess with it in __init__.
+        # Read it from the file to guarantee its contents
         known_installs: list[_AppInstall] = json.loads(self._known_installs_file.read_text())
         json_file_path: Path
         with as_file(self._known_installs_file) as f:
             json_file_path = f.relative_to(self._config.deploy.root)
 
-        owner_login = self._install_owners[event.install_id]
         known_installs.append({
             "install_id": event.install_id,
             "owner": owner_login,
@@ -208,7 +232,7 @@ class GitHubWatcher(EventsWorker[_Events]):
 
         install_content = json.dumps(known_installs, indent=2)
 
-        self._github_self.graphql \
+        self._github_main.graphql \
             .request(query="mutation ($input: CreateCommitOnBranchInput!) {"
                            "  createCommitOnBranch(input: $input) {"
                            "    commit {"
@@ -219,7 +243,7 @@ class GitHubWatcher(EventsWorker[_Events]):
                      variables={
                          "input": {
                              "branch": {
-                                 "repositoryNameWithOwner": f"{self._self_owner}/{self._self_repo}",
+                                 "repositoryNameWithOwner": f"{self._main_owner}/{self._main_repo}",
                                  "branchName": branch_name
                              },
                              "message": {
@@ -248,48 +272,75 @@ class GitHubWatcher(EventsWorker[_Events]):
         pr_body += "1. Fix the permissions for the GitHub app to only have access to the plugins you expect\n"
         pr_body += "2. Mark this PR as closed, but do NOT label it as \"rejected-plugin\"\n"
 
-        self._github_self.rest.pulls.create(
-            owner=self._self_owner,
-            repo=self._self_repo,
+        self._github_main.rest.pulls.create(
+            owner=self._main_owner,
+            repo=self._main_repo,
             data={
                 "title": f"Confirm install {event.install_id} for {owner_login}",
                 "head": branch_name,
-                "base": "main",  # TODO Don't hardcode
+                "base": self._main_default_branch,
                 "body": pr_body
             }
         )
 
-    def _check_for_app_updates(self) -> None:
+    def _check_for_updates(self) -> None:
+        self._check_for_update(self._main_owner, self._main_repo, self._config.deploy)
+
+        for owner_repo, plugin in self._config.plugins.items():
+            owner, repo = owner_repo.split("/")
+            self._check_for_update(owner=owner, repo=repo, deploy=plugin)
+
+    def _check_for_update(self, owner: str, repo: str, deploy: _HasCommitVersions):
         if self._deployment_in_progress.is_set():
             return
 
-        # TODO NOTE We can refactor this to return an updated commit or None for a given owner, repo, and "has commit versions".
-        # Then we can decide what event to put in the queue.
-        # All of this is so similar, that I'm very tempted to refactor it again and don't directly differentiate between
-        # plugin and app updates.
-        latest_commit: Commit = self._github_self.rest.repos.list_commits(
-            owner=self._self_owner,
-            repo=self._self_repo,
+        latest_commit: Commit = self._github_main.rest.repos.list_commits(
+            owner=owner,
+            repo=repo,
             per_page=1
         ).parsed_data[0]
 
-        if self._config.deploy.commit == latest_commit.sha:
+        if deploy.commit is not None and deploy.commit == latest_commit.sha:
+            print(f"No update needed for {owner}/{repo}")
             # No update needed
             return
 
         # TODO Check for commit status to make sure any actions are done
 
-        self._outbound_event_queue.put(ApplicationUpdateAvailable(
+        self._deployment_in_progress.set()  # This way we don't have multiple deployments going on at the same time
+        self._outbound_event_queue.put(UpdateAvailable(
+            owner=owner,
+            repo=repo,
             commit=latest_commit.sha
         ))
 
-    def _handle_application_update_available(self, event: ApplicationUpdateAvailable):
+    def _handle_update_available(self, event: UpdateAvailable):
+        print(f"Update available for {event.owner}/{event.repo}")
+        deploy: Optional[_HasCommitVersions] = None
+        github: Optional[GitHub] = None
+        if event.owner == self._main_owner and event.repo == self._main_repo:
+            deploy = self._config.deploy
+            github = self._github_main
+        else:
+            for install in self._known_installs:
+                if event.owner != install["owner"]:
+                    continue
+
+                if event.repo not in install["repos"]:
+                    continue
+
+                deploy = self._config.plugins[event.owner, event.repo]
+                github = self._github_installs[install["install_id"]]
+
+        if deploy is None or github is None:
+            raise Exception("Couldn't find required pieces for update")
+
         self._deploy_update(
-            github=self._github_self,
-            repo_owner=self._self_owner,
-            repo_name=self._self_repo,
+            github=github,
+            repo_owner=event.owner,
+            repo_name=event.repo,
             commit=event.commit,
-            has_commit_versions=self._config.deploy,
+            has_commit_versions=deploy,
             environment=self._config.deploy.environment
         )
 
@@ -385,9 +436,10 @@ class GitHubWatcher(EventsWorker[_Events]):
                 with full_path.open('wb') as fh:
                     fh.write(zf.read(zip_info.filename))
 
-        current_path = has_commit_versions.current_path
-        if current_path.exists(follow_symlinks=False):
-            current_path.unlink()
+        if has_commit_versions.commit is not None:
+            current_path = has_commit_versions.current_path
+            if current_path.exists(follow_symlinks=False):
+                current_path.unlink()
 
         has_commit_versions.commit = commit
         self._config.write()
@@ -396,11 +448,11 @@ class GitHubWatcher(EventsWorker[_Events]):
 
         self._outbound_event_queue.put(ApplicationRestartNeeded())  # Tell the worker event loop to stop everything
 
-    def _complete_application_deployments(self):
+    def _complete_deployments(self):
         self._complete_deployment_for_repo(
-            github=self._github_self,
-            repo_owner=self._self_owner,
-            repo_name=self._self_repo,
+            github=self._github_main,
+            repo_owner=self._main_owner,
+            repo_name=self._main_repo,
             commit=self._config.deploy.commit,
             environment=self._config.deploy.environment
         )
