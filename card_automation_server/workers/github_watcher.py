@@ -2,6 +2,8 @@ import base64
 import importlib.resources
 import io
 import json
+import subprocess
+import sys
 import threading
 import zipfile
 from datetime import timedelta
@@ -67,7 +69,8 @@ class GitHubWatcher(EventsWorker[_Events]):
         super().__init__()
         self._config = config
 
-        self._known_installs_file = importlib.resources.files('card_automation_server').joinpath('known_github_installs.json')
+        self._known_installs_file = importlib.resources.files('card_automation_server').joinpath(
+            'known_github_installs.json')
 
         self._known_installs: list[_AppInstall] = json.loads(self._known_installs_file.read_text())
         self._rejected_installs: set[int] = set()
@@ -441,14 +444,18 @@ class GitHubWatcher(EventsWorker[_Events]):
                     fh.write(zf.read(zip_info.filename))
 
         if has_commit_versions.commit is not None:
-            current_path = has_commit_versions.current_path
-            if current_path.exists(follow_symlinks=False):
-                current_path.unlink()
+            has_commit_versions.current_path.unlink(missing_ok=True)
 
         has_commit_versions.commit = commit
         self._config.write()
 
-        # The current path will be re-created with the new commit the next time it's accessed
+        requirements_file = has_commit_versions.current_path / "requirements.txt"
+        if requirements_file.exists():
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_file])
+
+        setup_file = has_commit_versions.current_path / "setup.py"
+        if setup_file.exists():
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-e", has_commit_versions.current_path])
 
         self._outbound_event_queue.put(ApplicationRestartNeeded())  # Tell the worker event loop to stop everything
 
