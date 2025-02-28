@@ -52,6 +52,8 @@ class _WinDSXConfig(ConfigHolder):
     cs_port: ConfigProperty[int]
     workstation_number: ConfigProperty[int]
 
+    common_doors: ConfigProperty[list[int]]
+
 
 class _SentryConfig(ConfigHolder):
     dsn: ConfigProperty[str]
@@ -82,6 +84,8 @@ class _PluginConfig(_HasCommitVersions, ConfigHolder):
     @property
     def config_path(self) -> Path:
         return self._plugin_path / "config.toml"
+
+    doors: ConfigProperty[list[int]]
 
 
 class _PluginsConfig(ConfigHolder):

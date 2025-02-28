@@ -13,6 +13,7 @@ from card_auto_add.plugins.setup import PluginSetup, HasErrorHandler
 from card_auto_add.windsx.engines import AcsEngine, LogEngine
 from card_auto_add.windsx.lookup.access_card import AccessCardLookup
 from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_auto_add.windsx.lookup.door_lookup import DoorLookup
 from card_auto_add.windsx.lookup.person import PersonLookup
 from card_auto_add.windsx.lookup.utils import LookupInfo
 from card_auto_add.workers.plugin_worker import PluginWorker
@@ -33,17 +34,21 @@ class PluginLoader:
         self._worker_event_loop = worker_event_loop
 
         self._sub_resolver = resolver.clone(
-            # AcsEngine,
-            # LogEngine,
-            # LookupInfo,
-            # AccessCardLookup,
-            # AclGroupComboLookup,
-            # PersonLookup,
-            # todo Door lookup with limited access after we get the config setup for that
+            AcsEngine,
+            LogEngine,
+            LookupInfo,
+            AccessCardLookup,
+            AclGroupComboLookup,
+            PersonLookup,
         )
 
         self._plugin_config = config.plugins[self._owner, self._repo]
         self._sub_resolver.singleton(ConfigPath, self._plugin_config.config_path)
+
+        doors = self._config.windsx.common_doors if self._config.windsx.common_doors is not None else []
+        doors.extend(self._plugin_config.doors if self._plugin_config.doors is not None else [])
+        door_lookup = DoorLookup(resolver(LookupInfo), *doors)
+        self._sub_resolver.singleton(door_lookup)
 
         self._error_handler: Optional[ErrorHandler] = None
 

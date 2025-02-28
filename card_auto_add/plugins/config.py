@@ -31,7 +31,18 @@ class ConfigProperty(Generic[T]):
         return raw_value
 
     def __set__(self, instance, value: Optional[T]):
-        if not isinstance(value, self._type):
+        is_valid_type = True
+        if hasattr(self._type, '__origin__') and hasattr(self._type, '__args__'):
+            if not isinstance(value, self._type.__origin__):
+                is_valid_type = False
+            else:
+                arg = self._type.__args__[0]
+                if not all(isinstance(x, arg) for x in value):
+                    is_valid_type = False
+        elif not isinstance(value, self._type):
+            is_valid_type = False
+
+        if not is_valid_type:
             raise Exception(f"Trying to assign to {self._name} an invalid type of {type(value)}. Expected {self._type}")
 
         # noinspection PyProtectedMember
