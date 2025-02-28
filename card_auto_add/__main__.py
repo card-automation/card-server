@@ -7,8 +7,12 @@ from platformdirs import PlatformDirs
 
 from card_auto_add.config import Config
 from card_auto_add.ioc import Resolver
+from card_auto_add.plugin_loader import PluginLoader
 from card_auto_add.windsx.db.engine_factory import EngineFactory
 from card_auto_add.windsx.engines import AcsEngine, LogEngine
+from card_auto_add.windsx.lookup.access_card import AccessCardLookup
+from card_auto_add.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_auto_add.windsx.lookup.person import PersonLookup
 from card_auto_add.windsx.lookup.utils import LookupInfo
 from card_auto_add.workers.card_pushed_watcher import CardPushedWatcher
 from card_auto_add.workers.card_scan_watcher import CardScanWatcher
@@ -46,6 +50,11 @@ class CardAutomationServer:
                                                  )
         self._resolver.singleton(lookup_info)
 
+        # These get carried over to the plugins directly, might as well make them now
+        self._resolver.singleton(AccessCardLookup)
+        self._resolver.singleton(AclGroupComboLookup)
+        self._resolver.singleton(PersonLookup)
+
         database_file_watcher = self._resolver(DatabaseFileWatcher,
                                                acs_db_path=self._config.windsx.acs_data_db_path,
                                                log_db_path=self._config.windsx.log_db_path,
@@ -72,6 +81,15 @@ class CardAutomationServer:
             # Allow plugins to override their doors
             self._resolver.singleton(door_override_controller),
         )
+
+        for owner_repo, plugin in self._config.plugins.items():
+            if plugin.commit is None:
+                continue  # We're not ready to load this plugin
+
+            owner, repo = owner_repo.split("/")
+            # Resolve the plugin loader to load the plugin. We only need to specify the owner and repo, everything else
+            # is type hinted.
+            self._resolver(PluginLoader, owner=owner, repo=repo)
 
 
 def main():

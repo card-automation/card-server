@@ -16,13 +16,15 @@ class PluginSetup(abc.ABC):
     def plugins(self) -> list[Plugin]:
         pass
 
+
+class HasErrorHandler(abc.ABC):
     @abc.abstractmethod
-    def error_handler(self) -> Optional[ErrorHandler]:
+    def error_handler(self) -> ErrorHandler:
         pass
 
 
 # TODO Unit test this
-class AutoDiscoverPlugins(PluginSetup, ABC):
+class AutoDiscoverPlugins(PluginSetup):
     def __init__(self, resolver: Resolver):
         self._resolver = resolver
 

@@ -18,10 +18,6 @@ class PluginWorker(EventsWorker[_PluginEvent]):
         self._next_loop_call_time = time.monotonic_ns()
         super().__init__()
 
-    # TODO None of these methods we're calling touch error handling atm. I'm thinking we make a new object that's
-    # a monkey patched version of the plugin we're given that implements the same classes but otherwise just
-    # delegates to the plugin itself with error handling wrapped. Makes the code below simpler.
-
     def _pre_run(self) -> None:
         if isinstance(self._plugin, PluginStartup):
             self._plugin.startup()

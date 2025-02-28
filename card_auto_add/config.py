@@ -93,7 +93,7 @@ class _PluginsConfig(ConfigHolder):
         self._data_root.mkdir(parents=True, exist_ok=True)
 
         self._plugins: dict[str, _PluginConfig] = {
-            key: _PluginConfig(value, self._data_root / key)
+            key: _PluginConfig(value, self._data_root / "plugins" / key)
             for (key, value) in config.items()
         }
 
