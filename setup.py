@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 VERSION = "1.0.0"
 
@@ -6,7 +6,6 @@ VERSION = "1.0.0"
 def readme():
     with open('README.md', encoding="utf8") as f:
         return f.read()
-
 
 setup(
     name="card-automation-server",
@@ -31,7 +30,7 @@ setup(
         "tomlkit",
         "watchdog",
     ],
-    packages=["card_automation_server"],
+    packages=find_packages(include=['card_automation_server', 'card_automation_server.*']),
     classifiers=[
         'License :: OSI Approved :: MIT License',
     ]
