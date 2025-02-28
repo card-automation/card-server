@@ -3,6 +3,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from card_automation_server.plugins.types import CardScan
 from card_automation_server.windsx.db.models import DEV, LOC
 from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
 from card_automation_server.workers.events import DoorStateUpdate, DoorState
@@ -47,6 +48,20 @@ class DoorLookup:
             return None
 
         return doors[0]
+
+    def by_card_scan(self, card_scan: CardScan) -> Optional['Door']:
+        statement = (
+            select(DEV)
+            .join(LOC, LOC.Loc == DEV.Loc)
+            .where(LOC.LocGrp == self._location_group_id)
+            .where(DEV.Loc == card_scan.location_id)
+            .where(DEV.Device == card_scan.device)
+        )
+        if len(self._door_ids) > 0:
+            statement = statement.where(DEV.ID.in_(self._door_ids))
+
+        dev = self._session.scalar(statement)
+        return Door(self._lookup_info, dev.ID) if dev is not None else None
 
 
 class Door(DbModel):

@@ -1,5 +1,8 @@
+from datetime import datetime
+from typing import Optional
 from unittest.mock import Mock
 
+from card_automation_server.plugins.types import CardScan, CardScanEventType
 from card_automation_server.windsx.lookup.door_lookup import DoorLookup, Door
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.events import DoorStateUpdate, DoorState
@@ -77,6 +80,36 @@ class TestDoorLookup:
         door_lookup: DoorLookup = DoorLookup(lookup_info, 1)
 
         door: Door = door_lookup.by_device_info(annex_location_id, 2)
+
+        assert door is None
+
+    def test_lookup_by_card_scan(self, lookup_info: LookupInfo):
+        door_lookup: DoorLookup = DoorLookup(lookup_info, 3, 4, 5, 7)  # Tenant 3 doors
+
+        door: Optional[Door] = door_lookup.by_card_scan(CardScan(
+            name_id=101,
+            card_number=3000,
+            scan_time=datetime.now(),
+            device=3,
+            event_type=CardScanEventType.ACCESS_GRANTED,
+            location_id=main_location_id
+        ))
+
+        assert door is not None
+        assert door.device_id == 3
+        assert door.location_id == main_location_id
+
+    def test_lookup_by_card_scan_that_we_cannot_access(self, lookup_info: LookupInfo):
+        door_lookup: DoorLookup = DoorLookup(lookup_info, 3, 4, 5, 7)  # Tenant 3 doors
+
+        door: Optional[Door] = door_lookup.by_card_scan(CardScan(
+            name_id=101,
+            card_number=3000,
+            scan_time=datetime.now(),
+            device=1,
+            event_type=CardScanEventType.ACCESS_GRANTED,
+            location_id=main_location_id
+        ))
 
         assert door is None
 
