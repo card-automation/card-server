@@ -132,6 +132,9 @@ class GitHubWatcher(EventsWorker[_Events]):
             self._handle_update_available(event)
 
     def _check_for_new_installations(self) -> None:
+        if self._config.deploy.commit is None:
+            return  # Don't even try it, we haven't even bootstrapped the main application
+
         install: Installation
         for install in self._github_app.paginate(self._github_app.rest.apps.list_installations):
             if install.id == self._self_install_id:
@@ -314,6 +317,7 @@ class GitHubWatcher(EventsWorker[_Events]):
 
         # TODO Check for commit status to make sure any actions are done
 
+        print("Update available!")
         self._deployment_in_progress.set()  # This way we don't have multiple deployments going on at the same time
         self._outbound_event_queue.put(UpdateAvailable(
             owner=owner,
