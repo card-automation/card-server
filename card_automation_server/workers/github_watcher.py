@@ -452,6 +452,8 @@ class GitHubWatcher(EventsWorker[_Events]):
 
         has_commit_versions.commit = commit
         self._config.write()
+        if not has_commit_versions.current_path.exists(follow_symlinks=False):
+            raise Exception("Current symlink wasn't auto-created")
 
         # This can't happen due to greenlet being installed with SQLAlchemy and that conflicting with
         # requirements_file = has_commit_versions.current_path / "requirements.txt"
