@@ -98,7 +98,7 @@ class _PluginsConfig(ConfigHolder):
                  config: TomlConfigType,
                  dirs: PlatformDirs):
         super().__init__(config)
-        self._data_root = dirs.user_data_path if sys.platform == "darwin" else dirs.site_data_path
+        self._data_root = dirs.user_data_path
         self._data_root.mkdir(parents=True, exist_ok=True)
 
         self._plugins: dict[str, _PluginConfig] = {
@@ -143,8 +143,7 @@ class Config(BaseConfig):
     def __init__(self, dirs: PlatformDirs):
         self._platformdirs = dirs
 
-        # Mac hates using the system path, so we just use the user path for testing.
-        config_root = dirs.user_config_path if sys.platform == "darwin" else dirs.site_config_path
+        config_root = dirs.user_config_path
         config_root.mkdir(parents=True, exist_ok=True)
         config_path = config_root / "config.toml"
 
