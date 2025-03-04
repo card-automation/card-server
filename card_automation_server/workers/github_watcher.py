@@ -229,7 +229,7 @@ class GitHubWatcher(EventsWorker[_Events]):
         known_installs: list[_AppInstall] = json.loads(self._known_installs_file.read_text())
         json_file_path: Path
         with as_file(self._known_installs_file) as f:
-            json_file_path = f.relative_to(self._config.deploy.root)
+            json_file_path = f.relative_to(self._config.deploy.versioned_path)
 
         known_installs.append({
             "install_id": event.install_id,
@@ -443,6 +443,8 @@ class GitHubWatcher(EventsWorker[_Events]):
                 if zip_info.is_dir():
                     full_path.mkdir(parents=True, exist_ok=True)
                     continue
+
+                full_path.parent.mkdir(parents=True, exist_ok=True)  # Sometimes the zip file doesn't tell us about everything
 
                 with full_path.open('wb') as fh:
                     fh.write(zf.read(zip_info.filename))
