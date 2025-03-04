@@ -454,6 +454,7 @@ class _AccessControlListUpdater:
             if current_acl == id_:
                 continue
 
+            print("Something changed!")
             something_changed = True
             setattr(loc_cards, name, id_)
 
