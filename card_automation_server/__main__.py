@@ -22,6 +22,7 @@ from card_automation_server.workers.comm_server_restarter import CommServerResta
 from card_automation_server.workers.database_file_watcher import DatabaseFileWatcher
 from card_automation_server.workers.door_override_controller import DoorOverrideController
 from card_automation_server.workers.dsx_hardware_reset_worker import DSXHardwareResetWorker
+from card_automation_server.workers.github_watcher import GitHubWatcher
 from card_automation_server.workers.update_callback_watcher import UpdateCallbackWatcher
 from card_automation_server.workers.worker_event_loop import WorkerEventLoop
 
@@ -83,6 +84,8 @@ class CardAutomationServer:
             self._resolver.singleton(CardPushedWatcher),
             # Allow plugins to override their doors
             self._resolver.singleton(door_override_controller),
+            # Check for updates to the app/plugins
+            self._resolver.singleton(GitHubWatcher),
         )
 
         for owner_repo, plugin in self._config.plugins.items():
