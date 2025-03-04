@@ -1,9 +1,6 @@
-import logging
 import signal
 import sys
 import time
-from logging import Logger
-from logging.handlers import RotatingFileHandler
 from typing import Optional
 
 import sentry_sdk
@@ -13,7 +10,6 @@ from sentry_sdk import capture_exception
 from card_automation_server.config import Config
 from card_automation_server.ioc import Resolver
 from card_automation_server.plugin_loader import PluginLoader
-from card_automation_server.plugins.config import LogPath
 from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.engines import AcsEngine, LogEngine
 from card_automation_server.windsx.lookup.access_card import AccessCardLookup
@@ -34,8 +30,9 @@ class CardAutomationServer:
     def __init__(self):
         self._resolver = Resolver()
         self._platformdirs: PlatformDirs = PlatformDirs("card-server", "card-automation")
+        self._resolver.singleton(self._platformdirs)
 
-        self._config = self._resolver(Config)
+        self._config = self._resolver.singleton(Config)
         sentry_sdk.init(self._config.sentry.dsn)
 
         self._worker_event_loop = self._resolver.singleton(WorkerEventLoop)
