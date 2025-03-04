@@ -453,13 +453,14 @@ class GitHubWatcher(EventsWorker[_Events]):
         has_commit_versions.commit = commit
         self._config.write()
 
-        requirements_file = has_commit_versions.current_path / "requirements.txt"
-        if requirements_file.exists():
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_file])
-
-        setup_file = has_commit_versions.current_path / "setup.py"
-        if setup_file.exists():
-            subprocess.check_call([sys.executable, "-m", "pip", "install", "-e", has_commit_versions.current_path])
+        # This can't happen due to greenlet being installed with SQLAlchemy and that conflicting with
+        # requirements_file = has_commit_versions.current_path / "requirements.txt"
+        # if requirements_file.exists():
+        #     subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", requirements_file])
+        #
+        # setup_file = has_commit_versions.current_path / "setup.py"
+        # if setup_file.exists():
+        #     subprocess.check_call([sys.executable, "-m", "pip", "install", "-e", has_commit_versions.current_path])
 
         self._outbound_event_queue.put(ApplicationRestartNeeded())  # Tell the worker event loop to stop everything
 
