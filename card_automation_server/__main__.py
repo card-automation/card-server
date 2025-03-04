@@ -99,6 +99,7 @@ class CardAutomationServer:
                 self._resolver(PluginLoader, owner=owner, repo=repo)
             except BaseException as ex:
                 capture_exception(ex)
+                print(ex)
 
     @property
     def is_alive(self) -> bool:

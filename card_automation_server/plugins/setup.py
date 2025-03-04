@@ -49,6 +49,12 @@ class AutoDiscoverPlugins(PluginSetup):
                     continue
 
                 item = getattr(module, name)
+                if not inspect.isclass(item):
+                    continue
+
+                if not hasattr(item, '__mro__'):
+                    continue
+
                 mro = inspect.getmro(item)
                 if Plugin not in mro:
                     continue  # Not a plugin at all
