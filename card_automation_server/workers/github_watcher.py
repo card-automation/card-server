@@ -256,7 +256,7 @@ class GitHubWatcher(EventsWorker[_Events]):
                                  "branchName": branch_name
                              },
                              "message": {
-                                 "headline": "Install"
+                                 "headline": f"Install #{event.install_id}"
                              },
                              "fileChanges": {
                                  "additions": [

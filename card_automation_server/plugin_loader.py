@@ -71,6 +71,8 @@ class PluginLoader:
 
             modules.append(module_name)
 
+        print("Found plugin modules: ", modules)
+
         for module_name in modules:
             import_name = f"{module_name}.plugin"
 
@@ -121,6 +123,8 @@ class PluginLoader:
                         methods_to_wrap = [x for x in dir(parent) if not x.startswith('_')]
                         for method in methods_to_wrap:
                             setattr(plugin, method, self._wrap_errors(getattr(plugin, method)))
+
+                    print(f"Found plugin file {plugin.__class__}")
 
                     worker_event_loop.add(
                         PluginWorker(plugin)
