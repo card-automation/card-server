@@ -384,6 +384,7 @@ class _AccessControlListUpdater:
         return result
 
     def __update_locations(self):
+        print("Updating locations")
         for location_id in self._location_ids_to_update:
             location = self._session.scalar(
                 select(LOC)
@@ -398,6 +399,7 @@ class _AccessControlListUpdater:
             self._session.add(location)
 
             self._session.commit()
+            print(f"Updated location {location_id}")
 
     def _deactivate_loc_cards(self):
         for location_id in self._locations:
@@ -442,6 +444,7 @@ class _AccessControlListUpdater:
                              acl4: int = -1
                              ) -> bool:
         something_changed = False
+        print(f"Set loc cards {acl} {acl1} {acl2} {acl3} {acl4}")
 
         acl_names = ["Acl", "Acl1", "Acl2", "Acl3", "Acl4"]
         acl_ids = [acl, acl1, acl2, acl3, acl4]
