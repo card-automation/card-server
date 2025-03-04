@@ -6,21 +6,25 @@ from logging.handlers import RotatingFileHandler
 
 from platformdirs import PlatformDirs
 
+from card_automation_server.config import Config
 from card_automation_server.workers.utils import ThreadedWorker
 
 
 class CommServerSocketListener(ThreadedWorker[None]):
-    def __init__(self, dirs: PlatformDirs):
+    def __init__(self, dirs: PlatformDirs, config: Config):
         super().__init__()
         self._a = 0
         self._b = 0
         self._c = 0
         self._d = 0
+        self._cs_host = config.windsx.cs_host
+        self._cs_port = config.windsx.cs_port
 
         log_root = dirs.user_data_path / "cs_raw"
         log_root.mkdir(parents=True, exist_ok=True)
 
         self._log = logging.getLogger('cs')
+        self._log.setLevel(logging.DEBUG)
 
         log_file = log_root / "cs.log"
         formatter = logging.Formatter('%(asctime)s - %(message)s')
@@ -28,7 +32,7 @@ class CommServerSocketListener(ThreadedWorker[None]):
         file_handler = RotatingFileHandler(log_file,
                                            maxBytes=max_bytes,
                                            backupCount=10)
-        file_handler.setLevel(logging.INFO)
+        file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
         self._log.addHandler(file_handler)
 
@@ -45,7 +49,7 @@ class CommServerSocketListener(ThreadedWorker[None]):
         result = []
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(10)
-            s.connect(("127.0.0.1", 22223))
+            s.connect((self._cs_host, self._cs_port))
             # 0 is request
             # 80 is workstation
             # last 0 is unknown
