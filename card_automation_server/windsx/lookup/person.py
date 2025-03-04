@@ -83,7 +83,7 @@ class _PersonSearchBase(abc.ABC):
 
         return search
 
-    def __get_udf_name_ids(self) -> Optional[set[int]]:
+    def __get_udf_name_ids(self) -> set[int]:
         udf_names_and_ids = self._session.execute(
             select(UdfName.UdfNum, UdfName.Name) \
                 .where(UdfName.LocGrp == self._lookup_info.location_group_id) \
@@ -141,8 +141,12 @@ class _PersonSearchBase(abc.ABC):
                 statement = statement.where(NAMES.LName == criteria)
             elif criteria_key == _SearchCriteria.UDF:
                 udf_name_ids = self.__get_udf_name_ids()
-                if udf_name_ids is not None:
+                if udf_name_ids:
                     statement = statement.where(NAMES.ID.in_(udf_name_ids))
+                else:
+                    # We have no matching criteria, so this query would fail anyway
+                    # Access hates having an empty query in an in_ statement.
+                    return []
             elif criteria_key == _SearchCriteria.CARD_CODE:
                 statement = statement.join(CARDS, CARDS.NameID == NAMES.ID) \
                     .where(CARDS.Code == criteria) \
