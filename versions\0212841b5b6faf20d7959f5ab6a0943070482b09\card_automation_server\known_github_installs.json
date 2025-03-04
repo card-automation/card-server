@@ -1,0 +1,16 @@
+[
+  {
+    "install_id": 61450811,
+    "owner": "card-automation",
+    "repos": [
+      "card-server"
+    ]
+  },
+  {
+    "install_id": 61452025,
+    "owner": "Denhac",
+    "repos": [
+      "card-access-plugin"
+    ]
+  }
+]
