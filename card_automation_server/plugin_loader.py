@@ -104,7 +104,7 @@ class PluginLoader:
                 instance: PluginSetup = self._sub_resolver(attr)
                 print(attr_name, instance)
 
-                if ErrorHandler in attr.__mro__:
+                if HasErrorHandler in attr.__mro__:
                     instance: HasErrorHandler
                     self._error_handler = instance.error_handler()
 
