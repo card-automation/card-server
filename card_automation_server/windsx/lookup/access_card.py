@@ -147,12 +147,15 @@ class AccessCard(DbModel):
 
         self._acl_group_combo.write()
 
+        today = datetime.combine(date.today(), datetime.min.time())
+
         card: CARDS = self._get_card_from_db()
         if card is None:
             card = CARDS(
                 LocGrp=self._location_group_id,
                 Code=self._card_number,
-                CardNum=str(self._card_number)
+                CardNum=str(self._card_number),
+                StartDate=today,
             )
 
         card.NameID = self._name_id
@@ -160,7 +163,6 @@ class AccessCard(DbModel):
         is_active: bool = len(self._acl_group_combo.names) > 0
         card.Status = is_active
 
-        today = datetime.combine(date.today(), datetime.min.time())
         card.StopDate = AccessCard.active_stop_date if is_active else today
 
         self._session.add(card)

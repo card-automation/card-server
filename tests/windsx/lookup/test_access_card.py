@@ -282,10 +282,34 @@ class TestAccessCardWrite:
         assert card.StartDate < self.today  # We don't care what it is, just that it's earlier than today
         assert card.StopDate == AccessCard.active_stop_date
 
-    def test_deactivating_a_card_sets_stop_date_to_forever(self,
-                                                           acs_updated_callback: Mock,
-                                                           access_card_lookup: AccessCardLookup,
-                                                           db_helper: DbHelper):
+    def test_rewriting_with_existing_access_level_sets_stop_date_to_forever(self,
+                                                                            acs_updated_callback: Mock,
+                                                                            access_card_lookup: AccessCardLookup,
+                                                                            db_helper: DbHelper):
+        access_card: AccessCard = access_card_lookup.by_card_number(2004)
+
+        assert access_card.in_db
+        assert not access_card.active
+        card: CARDS = db_helper.card_by_id(access_card.id)
+        assert card.StopDate <= self.today
+
+        access_card \
+            .with_access(_acl_name_main_building_access) \
+            .write()
+
+        assert acs_updated_callback.call_count == 2
+        # Second call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
+
+        card: CARDS = db_helper.card_by_id(access_card.id)
+        assert card.Status
+        assert card.StartDate < self.today  # We don't care what it is, just that it's earlier than today
+        assert card.StopDate == AccessCard.active_stop_date
+
+    def test_deactivating_a_card_sets_stop_date_to_today(self,
+                                                         acs_updated_callback: Mock,
+                                                         access_card_lookup: AccessCardLookup,
+                                                         db_helper: DbHelper):
         access_card: AccessCard = access_card_lookup.by_card_number(2000)
 
         assert access_card.in_db

@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 from typing import Generator
 from unittest.mock import Mock
@@ -335,7 +336,7 @@ def table_cards(session: Session):
     inactive_card = {
         'Status': False,
         'StartDate': datetime(year=2000, month=1, day=1),
-        'StopDate': datetime.today(),
+        'StopDate': datetime.combine(date.today(), datetime.min.time()),
     }
 
     session.add_all([
@@ -350,7 +351,9 @@ def table_cards(session: Session):
         # ToBe Hired with no access level
         CARDS(ID=5, LocGrp=location_group_id, NameID=403, Code=2002, AclGrpComboID=0, **inactive_card),
         # Sys Admin with no access level
-        CARDS(ID=6, LocGrp=location_group_id, NameID=303, Code=2003, AclGrpComboID=9, **inactive_card),
+        CARDS(ID=6, LocGrp=location_group_id, NameID=303, Code=2003, AclGrpComboID=0, **inactive_card),
+        # Best Employee with Main Building access (deactivated card)
+        CARDS(ID=7, LocGrp=location_group_id, NameID=401, Code=2004, AclGrpComboID=101, **inactive_card),
 
         # name ids [101, 102] are returned UNLESS we correctly filter on the location group for the card lookup
         CARDS(ID=1001, LocGrp=bad_location_group, NameID=102, Code=3000, AclGrpComboID=100, **active_card),
