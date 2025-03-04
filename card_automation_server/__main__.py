@@ -19,6 +19,7 @@ from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.card_pushed_watcher import CardPushedWatcher
 from card_automation_server.workers.card_scan_watcher import CardScanWatcher
 from card_automation_server.workers.comm_server_restarter import CommServerRestarter
+from card_automation_server.workers.comm_server_socket_listener import CommServerSocketListener
 from card_automation_server.workers.database_file_watcher import DatabaseFileWatcher
 from card_automation_server.workers.door_override_controller import DoorOverrideController
 from card_automation_server.workers.dsx_hardware_reset_worker import DSXHardwareResetWorker
@@ -86,6 +87,8 @@ class CardAutomationServer:
             self._resolver.singleton(door_override_controller),
             # Check for updates to the app/plugins
             self._resolver.singleton(GitHubWatcher),
+            # Handle raw Comm Server traffic
+            self._resolver.singleton(CommServerSocketListener)
         )
 
         for owner_repo, plugin in self._config.plugins.items():
