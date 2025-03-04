@@ -261,7 +261,7 @@ class GitHubWatcher(EventsWorker[_Events]):
                              "fileChanges": {
                                  "additions": [
                                      {
-                                         "path": str(json_file_path),
+                                         "path": str(json_file_path).replace('\\', '/'),
                                          "contents": base64.b64encode(install_content.encode('ascii'))
                                      }
                                  ]
