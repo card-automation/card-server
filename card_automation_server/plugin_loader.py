@@ -82,20 +82,26 @@ class PluginLoader:
                 if attr_name.startswith('_'):
                     continue
 
+                print("attr:", attr_name)
                 attr = getattr(module, attr_name)
                 if not hasattr(attr, '__module__'):
+                    print("attr has no module")
                     continue
 
                 if not attr.__module__.startswith(f"{module_name}."):
+                    print(f"attr module does not start with `{module_name}`")
                     continue
 
                 if not inspect.isclass(attr):
+                    print(f"attr is not a class")
                     continue
 
                 if not hasattr(attr, '__mro__'):
+                    print(f"attr does not implement anything")
                     continue
 
                 if PluginSetup not in attr.__mro__:
+                    print(f"attr does not implement PluginSetup")
                     continue
 
                 # attr is the class that is our plugin setup.
@@ -138,5 +144,7 @@ class PluginLoader:
             except BaseException as ex:
                 if self._error_handler is not None:
                     self._error_handler.capture_exception(ex)
+                else:
+                    raise ex
 
         return _inner
