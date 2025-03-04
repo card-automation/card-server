@@ -8,7 +8,8 @@ from card_automation_server.windsx.db.models import LocCards
 from card_automation_server.windsx.lookup.access_card import AccessCard
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.card_pushed_watcher import CardPushedWatcher
-from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, LocCardUpdated
+from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, \
+    LocCardUpdated
 from tests.conftest import acs_data_session, main_location_id, bad_main_location_id
 
 
@@ -194,6 +195,56 @@ class TestCardPushedWatcher:
         assert event.access_card is not None
         assert event.access_card.id == 5
         assert event.access_card.card_number == 2002
+
+    @pytest.mark.long
+    def test_worker_will_not_double_notify(self,
+                                           acs_data_session: Session,
+                                           card_pushed_watcher: CardPushedWatcher,
+                                           outbound_event_queue_empty: EmptyCallable):
+        loc_cards: LocCards = acs_data_session.scalar(
+            select(LocCards).where(LocCards.ID == 900)
+        )
+        assert loc_cards is not None
+        loc_cards.DlFlag = 1
+        loc_cards.CkSum = 0
+        acs_data_session.add(loc_cards)
+        acs_data_session.commit()
+
+        card_pushed_watcher.event(LocCardUpdated(
+            id=900,
+            card_id=5,
+            location_id=main_location_id
+        ))
+
+        # Wait for the event to be processed and make sure the watcher doesn't react
+        assert outbound_event_queue_empty()
+
+        # Now update it to have been written out
+        acs_data_session.refresh(loc_cards)
+        loc_cards.DlFlag = 0
+        acs_data_session.add(loc_cards)
+        acs_data_session.commit()
+
+        # The card has been written to the hardware
+        card_pushed_watcher.event(AcsDatabaseUpdated())
+
+        assert not outbound_event_queue_empty()
+
+        assert card_pushed_watcher.outbound_queue.qsize() == 1
+
+        event: AccessCardPushed = card_pushed_watcher.outbound_queue.get()
+        assert isinstance(event, AccessCardPushed)
+        assert event.access_card is not None
+        assert event.access_card.id == 5
+        assert event.access_card.card_number == 2002
+
+        # What happens if we get a second database updated event
+        card_pushed_watcher.event(AcsDatabaseUpdated())
+
+        # We should get no new events
+        assert outbound_event_queue_empty()
+
+        card_pushed_watcher.stop(3)  # No more events for you
 
     @pytest.mark.long
     def test_updated_to_bad_location_are_ignored(self,

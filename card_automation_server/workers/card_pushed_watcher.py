@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 from card_automation_server.windsx.db.models import LocCards, LOC
 from card_automation_server.windsx.lookup.access_card import AccessCard
 from card_automation_server.windsx.lookup.utils import LookupInfo
-from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, LocCardUpdated
+from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, \
+    LocCardUpdated
 from card_automation_server.workers.utils import EventsWorker
 
 # What events does this worker accept? Used for type hinting
@@ -91,7 +92,7 @@ class CardPushedWatcher(EventsWorker[_CardPushedWatcherEvents]):
             del self._loc_cards[lc_id]
 
     def _notify_of_card_pushed(self):
-        for card_id, locations in self._card_ids_to_location_updates.items():
+        for card_id, locations in self._card_ids_to_location_updates.copy().items():
             if len(locations) > 0:
                 continue  # Not all locations have been updated yet
 
@@ -100,6 +101,9 @@ class CardPushedWatcher(EventsWorker[_CardPushedWatcherEvents]):
                     AccessCard(self._lookup_info, card_id)
                 )
             )
+
+            # Now that all locations have been updated, it's safe to remove this so we don't double notify
+            del self._card_ids_to_location_updates[card_id]
 
     def _bring_in_new_cards(self):
         pending_loc_cards = self._acs_session.scalars(

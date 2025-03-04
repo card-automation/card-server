@@ -76,7 +76,16 @@ class ThreadedWorker(Generic[T], Worker):
         :return: Whether all tasks were completed
         """
         with self._inbound_event_queue.all_tasks_done:
-            return self._inbound_event_queue.all_tasks_done.wait(timeout)
+            # If we start out with no unfinished tasks, they finished before we checked
+            if self._inbound_event_queue.unfinished_tasks == 0:
+                return True
+            # Otherwise, wait to see if we're notified
+            wait_result = self._inbound_event_queue.all_tasks_done.wait(timeout)
+            # If we weren't notified, but there's no unfinished tasks then there was a race condition before we waited.
+            # It still means we have no unfinished tasks.
+            if not wait_result and self._inbound_event_queue.unfinished_tasks == 0:
+                return True
+            return wait_result
 
     @abc.abstractmethod
     def _run(self) -> None:
