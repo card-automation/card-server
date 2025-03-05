@@ -147,10 +147,6 @@ class BaseConfig(ConfigHolder, abc.ABC):
         file_handler.setFormatter(formatter)
         self._logger.addHandler(file_handler)
 
-        # Force a new log file on application restart
-        if log_path.exists():
-            file_handler.doRollover()
-
         config: tomlkit.TOMLDocument
         if self._config_path.exists():
             with self._config_path.open('r') as fh:
