@@ -251,19 +251,19 @@ class Badge(AcsDataBase):
 class CARDS(AcsDataBase):
     __tablename__ = 'CARDS'
 
-    ID: Mapped[int] = mapped_column('ID', nullable=True)
+    ID: Mapped[int] = mapped_column('ID', primary_key=True)
     NameID: Mapped[int] = mapped_column('NameID', ForeignKey('NAMES.ID'))
-    LocGrp: Mapped[int] = mapped_column('LocGrp', ForeignKey('LocGrp.LocGrp'), primary_key=True)
-    Code: Mapped[float] = mapped_column('Code', primary_key=True, default=1.0)
+    LocGrp: Mapped[int] = mapped_column('LocGrp', ForeignKey('LocGrp.LocGrp'))
+    Code: Mapped[float] = mapped_column('Code', default=1.0)
     Pin: Mapped[int] = mapped_column('Pin', nullable=True, default=0)
     StartDate: Mapped[datetime] = mapped_column('StartDate',
-                                                default=datetime(year=1000, month=1, day=1, hour=0, minute=0, second=0))
+                                                default=datetime(year=1753, month=1, day=1, hour=0, minute=0, second=0))
     StopDate: Mapped[datetime] = mapped_column('StopDate',
                                                default=datetime(year=9999, month=12, day=31, hour=0, minute=0,
                                                                 second=0))
     Status: Mapped[bool] = mapped_column('Status', nullable=True)
     CardNum: Mapped[str] = mapped_column('CardNum', nullable=True)
-    GTour: Mapped[bool] = mapped_column('GTour', nullable=True)
+    GTour: Mapped[bool] = mapped_column('GTour', nullable=False, default=False)
     NumUses: Mapped[int] = mapped_column('NumUses', default=9999)
     Notes: Mapped[str] = mapped_column('Notes', default='')
     DlFlag: Mapped[int] = mapped_column('DlFlag', nullable=True, default=0)
@@ -705,7 +705,7 @@ class LocCards(AcsDataBase):
     Acl: Mapped[int] = mapped_column('Acl', nullable=True, default=0)
     Oll: Mapped[int] = mapped_column('Oll', nullable=True, default=0)
     LastDate: Mapped[datetime] = mapped_column('LastDate', nullable=True,
-                                               default=datetime(year=1000, month=1, day=1, hour=0, minute=0, second=0))
+                                               default=datetime(year=1753, month=1, day=1, hour=0, minute=0, second=0))
     LastDev: Mapped[int] = mapped_column('LastDev', nullable=True, default=-1)
     InOut1: Mapped[str] = mapped_column('InOut1', nullable=True, default='N')
     InOut2: Mapped[str] = mapped_column('InOut2', nullable=True, default='N')
