@@ -82,7 +82,6 @@ class PluginLoader:
                 if attr_name.startswith('_'):
                     continue
 
-                print("attr:", attr_name)
                 attr = getattr(module, attr_name)
                 if not hasattr(attr, '__module__'):
                     continue
@@ -102,7 +101,6 @@ class PluginLoader:
                 # attr is the class that is our plugin setup.
 
                 instance: PluginSetup = self._sub_resolver(attr)
-                print(attr_name, instance)
 
                 if HasErrorHandler in attr.__mro__:
                     instance: HasErrorHandler
