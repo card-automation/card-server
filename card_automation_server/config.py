@@ -88,7 +88,9 @@ class _PluginConfig(_HasCommitVersions, ConfigHolder):
 
     @property
     def log_path(self) -> Path:
-        return self._plugin_path / "plugin.log"
+        log_root = self._plugin_path / "logs"
+        log_root.mkdir(parents=True, exist_ok=True)
+        return log_root / "plugin.log"
 
     doors: ConfigProperty[list[int]]
 
@@ -147,7 +149,9 @@ class Config(BaseConfig):
         config_root.mkdir(parents=True, exist_ok=True)
         config_path = config_root / "config.toml"
 
-        log_path: Path = config_root / "card-server.log"
+        log_root = config_root / "logs"
+        log_root.mkdir(parents=True, exist_ok=True)
+        log_path: Path = log_root / "card-server.log"
 
         super().__init__(ConfigPath(config_path), LogPath(log_path))
 
