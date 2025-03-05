@@ -21,7 +21,6 @@ class UpdateCallbackWatcher(Worker):
         return self._acs_updated_callback
 
     def _acs_updated_callback(self, value: Any) -> None:
-        print(f"Got an update  callback: {value}")
         if isinstance(value, LocCards):
             self.__loc_cards(value)
 

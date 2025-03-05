@@ -31,6 +31,7 @@ class PluginLoader:
         self._owner = owner
         self._repo = repo
         self._config = config
+        self._log = config.logger
         self._worker_event_loop = worker_event_loop
 
         self._sub_resolver = resolver.clone(
@@ -54,7 +55,6 @@ class PluginLoader:
         self._error_handler: Optional[ErrorHandler] = None
 
         # First, we need to find this plugin and add it to sys.paths
-        print(self._owner, self._repo, self._plugin_config.config_path)
 
         plugin_path = self._plugin_config.versioned_path
         sys.path.append(str(plugin_path))
@@ -71,7 +71,7 @@ class PluginLoader:
 
             modules.append(module_name)
 
-        print("Found plugin modules: ", modules)
+        self._log.info(f"Found plugin modules: {modules}")
 
         for module_name in modules:
             import_name = f"{module_name}.plugin"
@@ -123,7 +123,7 @@ class PluginLoader:
                         for method in methods_to_wrap:
                             setattr(plugin, method, self._wrap_errors(getattr(plugin, method)))
 
-                    print(f"Found plugin file {plugin.__class__}")
+                    self._log.info(f"Found plugin file {plugin.__class__}")
 
                     worker_event_loop.add(
                         PluginWorker(plugin)

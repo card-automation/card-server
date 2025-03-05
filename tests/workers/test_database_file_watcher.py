@@ -32,8 +32,6 @@ class TestDatabaseFileWatcher:
     def test_emits_acs_updated_event(self,
                                      acs_db_path: Path,
                                      database_file_watcher: DatabaseFileWatcher):
-        print(acs_db_path)
-
         with acs_db_path.open('w+') as fh:
             fh.writelines("Fake DB update")  # Our watcher doesn't care about the contents, only the file update
 
@@ -49,8 +47,6 @@ class TestDatabaseFileWatcher:
     def test_emits_log_updated_event(self,
                                      log_db_path: Path,
                                      database_file_watcher: DatabaseFileWatcher):
-        print(log_db_path)
-
         with log_db_path.open('w+') as fh:
             fh.writelines("Fake DB update")  # Our watcher doesn't care about the contents, only the file update
 

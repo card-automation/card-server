@@ -556,11 +556,6 @@ def plugin_worker_factory() -> Generator[PluginWorkerFactory, None, None]:
         yield pwf
 
 
-class MyEventHandler(FileSystemEventHandler):
-    def on_any_event(self, event: FileSystemEvent) -> None:
-        print(event)
-
-
 @pytest.fixture
 def app_config(tmp_path: Path) -> Config:
     dirs = MagicMock(PlatformDirs("card-server_tests", "card-automation"))

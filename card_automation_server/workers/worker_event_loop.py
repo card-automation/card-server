@@ -2,6 +2,7 @@ import threading
 from queue import Empty
 from typing import Any
 
+from card_automation_server.config import Config
 from card_automation_server.workers.events import WorkerEvent, ApplicationRestartNeeded
 from card_automation_server.workers.utils import Worker, EventsWorker
 
@@ -35,8 +36,9 @@ class _WorkerMonitorThread:
 
 
 class WorkerEventLoop(EventsWorker[Any]):
-    def __init__(self):
+    def __init__(self, config: Config):
         super().__init__()
+        self._log = config.logger
         self._worker_threads: list[_WorkerMonitorThread] = []
         self._event_to_workers: dict[WorkerEvent, list[EventsWorker]] = {}
 
@@ -75,9 +77,9 @@ class WorkerEventLoop(EventsWorker[Any]):
             worker_thread.stop_running.set()
 
     def _handle_event(self, event: Any):
-        print(f"Event: {event.__class__.__name__}")
+        self._log.debug(f"Event: {event.__class__.__name__}")
         if event.__class__ == ApplicationRestartNeeded:
-            print("Restarting app")
+            self._log.info("Stopping Worker Event Loop to restart app")
             self.stop()
             return
 
@@ -87,5 +89,5 @@ class WorkerEventLoop(EventsWorker[Any]):
         workers = self._event_to_workers[event.__class__]
         worker: EventsWorker
         for worker in workers:
-            print(f"Sending to {worker.__class__.__name__}")
+            self._log.debug(f"Sending to {worker.__class__.__name__}")
             worker.event(event)

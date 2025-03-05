@@ -68,6 +68,7 @@ class GitHubWatcher(EventsWorker[_Events]):
     def __init__(self, config: Config):
         super().__init__()
         self._config = config
+        self._log = config.logger
 
         self._known_installs_file = importlib.resources.files('card_automation_server').joinpath(
             'known_github_installs.json')
@@ -311,13 +312,11 @@ class GitHubWatcher(EventsWorker[_Events]):
         ).parsed_data[0]
 
         if deploy.commit is not None and deploy.commit == latest_commit.sha:
-            print(f"No update needed for {owner}/{repo}")
             # No update needed
             return
 
         # TODO Check for commit status to make sure any actions are done
 
-        print("Update available!")
         self._deployment_in_progress.set()  # This way we don't have multiple deployments going on at the same time
         self._outbound_event_queue.put(UpdateAvailable(
             owner=owner,
@@ -341,7 +340,7 @@ class GitHubWatcher(EventsWorker[_Events]):
         return None, None
 
     def _handle_update_available(self, event: UpdateAvailable):
-        print(f"Update available for {event.owner}/{event.repo}")
+        self._log.info(f"Update available for {event.owner}/{event.repo}")
         deploy, github = self._get_deploy_and_github(event.owner, event.repo)
 
         if deploy is None or github is None:
@@ -414,7 +413,6 @@ class GitHubWatcher(EventsWorker[_Events]):
             ).parsed_data
 
         if not in_progress:
-            print("Marking as in progress")
             github.rest.repos.create_deployment_status(
                 owner=repo_owner,
                 repo=repo_name,

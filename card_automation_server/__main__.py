@@ -36,6 +36,7 @@ class CardAutomationServer:
 
         self._config = self._resolver.singleton(Config)
         sentry_sdk.init(self._config.sentry.dsn)
+        self._logger = self._config.logger
 
         self._worker_event_loop = self._resolver.singleton(WorkerEventLoop)
         self._worker_event_loop.start()
@@ -92,7 +93,7 @@ class CardAutomationServer:
                 self._resolver(PluginLoader, owner=owner, repo=repo)
             except BaseException as ex:
                 capture_exception(ex)
-                print(ex)
+                self._logger.exception(ex)
 
     @property
     def is_alive(self) -> bool:
