@@ -34,7 +34,13 @@ class CommServerSocketListener(ThreadedWorker[None]):
                                            backupCount=10)
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
+
+        if log_file.exists():
+            file_handler.doRollover()
+
         self._log.addHandler(file_handler)
+
+        self._caught_up = False
 
     def _run(self) -> None:
         while not self._keep_running.is_set():
@@ -42,6 +48,15 @@ class CommServerSocketListener(ThreadedWorker[None]):
 
             for line in result:
                 self._log.debug(f"< {line.rstrip('\r\n')}")
+
+            if not self._caught_up:
+                if len(result) > 0:
+                    continue
+                else:
+                    self._caught_up = True
+                    self._log.info("CS Socket caught up")
+
+            # TODO emit raw message event
 
             time.sleep(0.5)  # Tight loop, let us know about new events fast
 
