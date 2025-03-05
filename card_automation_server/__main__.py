@@ -60,16 +60,6 @@ class CardAutomationServer:
         self._resolver.singleton(AclGroupComboLookup)
         self._resolver.singleton(PersonLookup)
 
-        database_file_watcher = self._resolver(DatabaseFileWatcher,
-                                               acs_db_path=self._config.windsx.acs_data_db_path,
-                                               log_db_path=self._config.windsx.log_db_path,
-                                               )
-
-        door_override_controller = self._resolver(DoorOverrideController,
-                                                  workstation_number=self._config.windsx.workstation_number,
-                                                  comm_server_host=self._config.windsx.cs_host,
-                                                  comm_server_port=self._config.windsx.cs_port)
-
         self._worker_event_loop.add(
             # When someone updates a data model.
             self._resolver.singleton(update_callback_watcher),
@@ -78,13 +68,13 @@ class CardAutomationServer:
             # When the card can't be pushed, and we have to give the hardware a little nudge
             self._resolver.singleton(DSXHardwareResetWorker),
             # When our databases on disk updates
-            self._resolver.singleton(database_file_watcher),
+            self._resolver.singleton(DatabaseFileWatcher),
             # When someone badges in
             self._resolver.singleton(CardScanWatcher),
             # We want to provide updates for when we see a card is pushed out
             self._resolver.singleton(CardPushedWatcher),
             # Allow plugins to override their doors
-            self._resolver.singleton(door_override_controller),
+            self._resolver.singleton(DoorOverrideController),
             # Check for updates to the app/plugins
             self._resolver.singleton(GitHubWatcher),
             # Handle raw Comm Server traffic

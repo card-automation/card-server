@@ -3,6 +3,7 @@ import time
 from datetime import datetime
 from typing import Union
 
+from card_automation_server.config import Config
 from card_automation_server.workers.events import DoorStateUpdate, DoorState
 from card_automation_server.workers.utils import EventsWorker
 
@@ -13,12 +14,11 @@ _Events = Union[
 
 class DoorOverrideController(EventsWorker[_Events]):
     def __init__(self,
-                 workstation_number: int,
-                 comm_server_host: str,
-                 comm_server_port: int):
-        self._workstation_number = workstation_number
-        self._comm_server_host = comm_server_host
-        self._comm_server_port = comm_server_port
+                 config: Config,
+                 ):
+        self._workstation_number = config.windsx.workstation_number
+        self._comm_server_host = config.windsx.cs_host
+        self._comm_server_port = config.windsx.cs_port
 
         self._timeout_map: dict[(int, int), datetime] = {}
 

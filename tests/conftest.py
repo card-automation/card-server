@@ -1,14 +1,16 @@
 from datetime import date
 from pathlib import Path
 from typing import Generator
-from unittest.mock import Mock
+from unittest.mock import Mock, MagicMock
 
 import pytest
 from _pytest.fixtures import FixtureRequest
+from platformdirs import PlatformDirs
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
+from card_automation_server.config import Config
 from card_automation_server.ioc import Resolver
 from card_automation_server.plugins.interfaces import Plugin
 from card_automation_server.plugins.types import CardScanEventType
@@ -315,7 +317,8 @@ def table_udf(session: Session):
         UDF(LocGrp=location_group_id, NameID=101, UdfNum=1, UdfText="5000"),  # BobThe BuildingManager UDF ID
         UDF(LocGrp=location_group_id, NameID=101, UdfNum=2, UdfText="Apple"),  # BobThe BuildingManager UDF Fruit
         UDF(LocGrp=location_group_id, NameID=110, UdfNum=1, UdfText="6000"),  # Fire Key UDF ID (Used for regex search)
-        UDF(LocGrp=location_group_id, NameID=201, UdfNum=1, UdfText="5001"),  # Ray Securitay UDF ID (Used for regex search)
+        UDF(LocGrp=location_group_id, NameID=201, UdfNum=1, UdfText="5001"),
+        # Ray Securitay UDF ID (Used for regex search)
 
         # name ids [101, 102] are returned UNLESS we correctly filter on the location group here in the UDF table.
         UDF(LocGrp=bad_location_group, NameID=102, UdfNum=1, UdfText="5000"),
@@ -559,5 +562,15 @@ class MyEventHandler(FileSystemEventHandler):
 
 
 @pytest.fixture
-def resolver() -> Resolver:
-    return Resolver()
+def app_config(tmp_path: Path) -> Config:
+    dirs = MagicMock(PlatformDirs("card-server_tests", "card-automation"))
+    dirs.user_config_path = tmp_path
+
+    return Config(dirs)
+
+
+@pytest.fixture
+def resolver(app_config: Config) -> Resolver:
+    resolver = Resolver()
+    resolver.singleton(Config, app_config)
+    return resolver

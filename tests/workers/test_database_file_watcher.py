@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+from card_automation_server.config import Config
 from card_automation_server.workers.database_file_watcher import DatabaseFileWatcher
 from card_automation_server.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
 
@@ -9,11 +10,14 @@ from card_automation_server.workers.events import AcsDatabaseUpdated, LogDatabas
 @pytest.fixture
 def database_file_watcher(
         acs_db_path: Path,
-        log_db_path: Path
+        log_db_path: Path,
+        app_config: Config
 ):
+    app_config.windsx.acs_data_db_path = acs_db_path
+    app_config.windsx.log_db_path = log_db_path
+
     watcher = DatabaseFileWatcher(
-        acs_db_path,
-        log_db_path
+        app_config
     )
 
     watcher.start()
