@@ -1,4 +1,3 @@
-import inspect
 import threading
 from queue import Empty
 from typing import Any
@@ -76,7 +75,7 @@ class WorkerEventLoop(EventsWorker[Any]):
             worker_thread.stop_running.set()
 
     def _handle_event(self, event: Any):
-        print(f"Event: {event}")
+        print(f"Event: {event.__class__.__name__}")
         if event.__class__ == ApplicationRestartNeeded:
             print("Restarting app")
             self.stop()
@@ -88,5 +87,5 @@ class WorkerEventLoop(EventsWorker[Any]):
         workers = self._event_to_workers[event.__class__]
         worker: EventsWorker
         for worker in workers:
-            print(f"Sending to {worker.__class__}")
+            print(f"Sending to {worker.__class__.__name__}")
             worker.event(event)
