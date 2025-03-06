@@ -16,6 +16,7 @@ from card_automation_server.plugins.interfaces import Plugin
 from card_automation_server.plugins.types import CardScanEventType
 from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.db.models import *
+from card_automation_server.windsx.engines import AcsEngine, LogEngine
 from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
 from card_automation_server.windsx.lookup.person import PersonLookup
@@ -565,7 +566,13 @@ def app_config(tmp_path: Path) -> Config:
 
 
 @pytest.fixture
-def resolver(app_config: Config) -> Resolver:
+def resolver(
+        app_config: Config,
+        acs_data_engine: Engine,
+        log_engine: Engine
+) -> Resolver:
     resolver = Resolver()
     resolver.singleton(Config, app_config)
+    resolver.singleton(AcsEngine, acs_data_engine)
+    resolver.singleton(LogEngine, log_engine)
     return resolver

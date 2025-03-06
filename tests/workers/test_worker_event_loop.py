@@ -3,6 +3,7 @@ from typing import Union
 
 import pytest
 
+from card_automation_server.config import Config
 from card_automation_server.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated, ApplicationRestartNeeded
 from card_automation_server.workers.utils import ThreadedWorker, EventsWorker
 from card_automation_server.workers.worker_event_loop import WorkerEventLoop
@@ -47,8 +48,8 @@ class UnionEventWorker(EventsWorker[Union[AcsDatabaseUpdated, LogDatabaseUpdated
 
 
 @pytest.fixture
-def event_loop():
-    worker = WorkerEventLoop()
+def event_loop(app_config: Config):
+    worker = WorkerEventLoop(app_config)
 
     worker.start()
 

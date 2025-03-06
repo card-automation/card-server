@@ -1,21 +1,19 @@
 from datetime import datetime
 
 import pytest
-from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
-from card_automation_server.config import Config
+from card_automation_server.ioc import Resolver
 from card_automation_server.plugins.types import CardScanEventType
 from card_automation_server.windsx.db.models import EvnLog
-from card_automation_server.windsx.engines import LogEngine
 from card_automation_server.workers.card_scan_watcher import CardScanWatcher
 from card_automation_server.workers.events import CardScanned, LogDatabaseUpdated
 from tests.conftest import main_location_id
 
 
 @pytest.fixture
-def card_scan_watcher(log_engine: Engine, app_config: Config):
-    watcher = CardScanWatcher(LogEngine(log_engine), app_config)
+def card_scan_watcher(resolver: Resolver):
+    watcher = resolver.singleton(CardScanWatcher)
 
     watcher.start()
 

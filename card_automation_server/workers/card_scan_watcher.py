@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from card_automation_server.config import Config
 from card_automation_server.plugins.types import CardScanEventType, CardScan
 from card_automation_server.windsx.db.models import EvnLog, NAMES, CARDS
-from card_automation_server.windsx.engines import LogEngine
+from card_automation_server.windsx.engines import LogEngine, AcsEngine
 from card_automation_server.workers.events import LogDatabaseUpdated, CardScanned, RawCommServerMessage
 from card_automation_server.workers.utils import EventsWorker
 
@@ -19,13 +19,15 @@ _Events = Union[
 
 class CardScanWatcher(EventsWorker[_Events]):
     def __init__(self,
+                 acs_engine: AcsEngine,
                  log_engine: LogEngine,
                  config: Config,
                  ):
         super().__init__()
         self._log = config.logger
-        self.db_session = Session(log_engine)
-        self._last_timestamp = self.db_session.scalar(select(func.max(EvnLog.TimeDate)))
+        self._db_log_session = Session(log_engine)
+        self._db_acs_session = Session(acs_engine)
+        self._last_timestamp = self._db_log_session.scalar(select(func.max(EvnLog.TimeDate)))
 
     def _handle_event(self, event: _Events):
         if isinstance(event, LogDatabaseUpdated):
@@ -36,7 +38,7 @@ class CardScanWatcher(EventsWorker[_Events]):
             self._log.debug(f"Got an event we don't know how to handle for some reason {type(event)}")
 
     def _handle_log_database_update(self, _: LogDatabaseUpdated):
-        latest_events = self.db_session.scalars(
+        latest_events = self._db_log_session.scalars(
             select(EvnLog)
             .where(EvnLog.TimeDate > self._last_timestamp)
             .order_by(EvnLog.TimeDate)
@@ -98,7 +100,7 @@ class CardScanWatcher(EventsWorker[_Events]):
         device_id = message.data[3]
         card_number = message.data[21]
 
-        name_id = self.db_session.scalar(
+        name_id = self._db_acs_session.scalar(
             select(NAMES.ID)
             .join(CARDS, CARDS.NameID == NAMES.ID)
             .where(CARDS.Code == float(card_number))
