@@ -85,9 +85,21 @@ class Resolver:
             elif name in annotations:
                 argument_class = annotations[name]
 
+                is_optional = False
+                if hasattr(argument_class, '__origin__') \
+                        and hasattr(argument_class, '__args__') \
+                        and argument_class.__origin__ == Union \
+                        and len(argument_class.__args__) == 2 \
+                        and type(None) in argument_class.__args__:
+                    is_optional = True
+                    argument_class = [x for x in argument_class.__args__ if x != type(None)][0]
+
+
                 if argument_class in arguments_dictionary:
                     arg_instance = arguments_dictionary[argument_class]
                     del arguments_dictionary[argument_class]
+                elif is_optional and argument_class not in self:
+                    arg_instance = None
                 else:
                     arg_instance = self.__call__(argument_class)
 

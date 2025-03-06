@@ -1,4 +1,4 @@
-from typing import NewType
+from typing import NewType, Optional
 
 import pytest
 
@@ -12,6 +12,11 @@ class NoArgumentClass:
 
 class OneAnnotatedArgumentClass:
     def __init__(self, arg: NoArgumentClass):
+        self.arg = arg
+
+
+class OptionalAnnotatedArgumentClass:
+    def __init__(self, arg: Optional[NoArgumentClass]):
         self.arg = arg
 
 
@@ -175,6 +180,19 @@ class TestArgsAndKwargs:
         assert exception.argument_type == int
         assert exception.argument_name == 'a'
         assert exception.argument == 3
+
+    def test_optional_argument_class_with_no_argument(self, resolver: Resolver):
+        obj = resolver(OptionalAnnotatedArgumentClass)
+
+        assert isinstance(obj, OptionalAnnotatedArgumentClass)
+        assert obj.arg is None
+
+    def test_optional_argument_class_with_singleton_argument(self, resolver: Resolver):
+        arg = resolver.singleton(NoArgumentClass)
+        obj = resolver(OptionalAnnotatedArgumentClass)
+
+        assert isinstance(obj, OptionalAnnotatedArgumentClass)
+        assert obj.arg is arg
 
 
 class TestCloning:
