@@ -2,7 +2,7 @@ import abc
 import enum
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, Union
 
 from card_automation_server.plugins.types import CardScan
 from card_automation_server.windsx.lookup.access_card import AccessCard
@@ -102,3 +102,42 @@ class DoorStateUpdate(WorkerEvent):
 
 class ApplicationRestartNeeded(WorkerEvent):
     pass
+
+
+class MessageParseException(Exception):
+    pass
+
+
+class RawCommServerMessage(WorkerEvent):
+    def __init__(self, data: list[Union[int, str]]):
+        self._data = data
+
+    @staticmethod
+    def parse(packet: str) -> 'RawCommServerMessage':
+        packet = packet.strip()
+        if len(packet) == 0:
+            raise MessageParseException("Cannot parse empty string")
+
+        if '*' in packet:
+            left, right = packet.split('*')
+            left = left.strip(' ')
+        else:
+            left, right = packet, None
+
+        if len(left) == 0:
+            raise MessageParseException("Cannot parse packet with no numeric data")
+
+        data: list[Union[int, str]] = [int(x) for x in left.split(' ')]
+
+        if right is not None:
+            data.append(right)
+
+        return RawCommServerMessage(data)
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def type(self) -> int:
+        return self._data[0]
