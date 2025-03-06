@@ -32,10 +32,9 @@ class CardScanWatcher(EventsWorker[_Events]):
     def _handle_event(self, event: _Events):
         if isinstance(event, LogDatabaseUpdated):
             self._handle_log_database_update(event)
-        elif isinstance(event, RawCommServerMessage):
+
+        if isinstance(event, RawCommServerMessage):
             self._handle_raw_comm_server_message(event)
-        else:
-            self._log.debug(f"Got an event we don't know how to handle for some reason {type(event)}")
 
     def _handle_log_database_update(self, _: LogDatabaseUpdated):
         latest_events = self._db_log_session.scalars(
@@ -67,20 +66,15 @@ class CardScanWatcher(EventsWorker[_Events]):
             self._last_timestamp = max(self._last_timestamp, event.TimeDate)
 
     def _handle_raw_comm_server_message(self, message: RawCommServerMessage):
-        self._log.debug(f"Message data: {message.data}")
-
         if message.type != 1:
-            self._log.debug("Message wasn't our type")
             return  # We only handle log events for card scans
 
         if len(message.data) < 7:
-            self._log.debug("Message wasn't long enough")
             return  # Can't get the event type to see if it's one we care about
 
         event_type = message.data[6]
 
         if event_type not in [x.value for x in CardScanEventType]:
-            self._log.debug("Message wasn't our event")
             return  # Not a card scan event, safe to ignore
 
         timestamp = datetime(
@@ -93,7 +87,6 @@ class CardScanWatcher(EventsWorker[_Events]):
         )
 
         if timestamp < self._last_timestamp:
-            self._log.debug(f"Message timestamp {timestamp} before last seen timestamp {self._last_timestamp}")
             return  # Probably already seen it via DB update, ignore it (though this one is always faster)
 
         location_id = message.data[2]

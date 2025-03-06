@@ -128,7 +128,7 @@ class BaseConfig(ConfigHolder, abc.ABC):
         if '.' in module_name:
             module_name = module_name[:module_name.index('.')]
         self._logger = logging.getLogger(module_name)
-        self._logger.setLevel(logging.DEBUG)
+        self._logger.setLevel(logging.INFO)
 
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 

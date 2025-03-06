@@ -38,6 +38,8 @@ class CardAutomationServer:
         sentry_sdk.init(self._config.sentry.dsn)
         self._logger = self._config.logger
 
+        self._logger.info("Application Starting")
+
         self._worker_event_loop = self._resolver.singleton(WorkerEventLoop)
         self._worker_event_loop.start()
 
@@ -82,6 +84,10 @@ class CardAutomationServer:
             self._resolver.singleton(CommServerSocketListener)
         )
 
+        self._logger.info("Main application loaded")
+        plural = "" if len(self._config.plugins) == 1 else ""
+        self._logger.info(f"Loading {len(self._config.plugins.items())} plugin{plural}")
+
         for owner_repo, plugin in self._config.plugins.items():
             if plugin.commit is None:
                 continue  # We're not ready to load this plugin
@@ -95,12 +101,15 @@ class CardAutomationServer:
                 capture_exception(ex)
                 self._logger.exception(ex)
 
+        self._logger.info("Plugins loaded")
+
     @property
     def is_alive(self) -> bool:
         return self._worker_event_loop.is_alive
 
     def stop(self):
         self._worker_event_loop.stop()
+        self._logger.info("Goodbye!")
 
 
 cas: Optional[CardAutomationServer] = None
