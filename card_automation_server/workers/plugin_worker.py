@@ -6,13 +6,13 @@ from card_automation_server.plugins.interfaces import Plugin, PluginStartup, Plu
 from card_automation_server.workers.events import AccessCardPushed, CardScanned
 from card_automation_server.workers.utils import EventsWorker
 
-_PluginEvent = Union[
+_Events = Union[
     CardScanned,
     AccessCardPushed,
 ]
 
 
-class PluginWorker(EventsWorker[_PluginEvent]):
+class PluginWorker(EventsWorker[_Events]):
     def __init__(self, plugin: Plugin):
         self._plugin: Plugin = plugin
         self._next_loop_call_time = time.monotonic_ns()
@@ -38,7 +38,7 @@ class PluginWorker(EventsWorker[_PluginEvent]):
         if isinstance(self._plugin, PluginShutdown):
             self._plugin.shutdown()
 
-    def _handle_event(self, event: _PluginEvent):
+    def _handle_event(self, event: _Events):
         if isinstance(event, CardScanned) and isinstance(self._plugin, PluginCardScanned):
             self._plugin.card_scanned(event.card_scan)
 

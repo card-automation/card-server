@@ -17,7 +17,7 @@ _Events = Union[
 ]
 
 
-class CardScanWatcher(EventsWorker[LogDatabaseUpdated]):
+class CardScanWatcher(EventsWorker[_Events]):
     def __init__(self,
                  log_engine: LogEngine,
                  config: Config,

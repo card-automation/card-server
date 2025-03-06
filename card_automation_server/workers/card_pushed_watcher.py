@@ -12,7 +12,7 @@ from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCard
 from card_automation_server.workers.utils import EventsWorker
 
 # What events does this worker accept? Used for type hinting
-_CardPushedWatcherEvents = Union[
+_Events = Union[
     AcsDatabaseUpdated,
     AccessCardUpdated,
     LocCardUpdated
@@ -26,7 +26,7 @@ class LocCardInfo:
     location_id: int
 
 
-class CardPushedWatcher(EventsWorker[_CardPushedWatcherEvents]):
+class CardPushedWatcher(EventsWorker[_Events]):
     def __init__(self,
                  lookup_info: LookupInfo):
         self._lookup_info = lookup_info
@@ -44,7 +44,7 @@ class CardPushedWatcher(EventsWorker[_CardPushedWatcherEvents]):
     def _cleanup(self) -> None:
         self._acs_session.close()
 
-    def _handle_event(self, event: _CardPushedWatcherEvents):
+    def _handle_event(self, event: _Events):
         if isinstance(event, LocCardUpdated):
             loc_card_info = LocCardInfo(
                 id=event.id,
