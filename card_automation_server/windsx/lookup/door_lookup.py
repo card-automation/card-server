@@ -1,3 +1,4 @@
+import threading
 from datetime import timedelta
 from typing import Optional
 
@@ -18,6 +19,7 @@ class DoorLookup:
         self._location_group_id: int = lookup_info.location_group_id
         self._session = Session(lookup_info.acs_engine)
         self._door_ids = list(door_ids)
+        self._lock = threading.Lock()
 
     def all(self) -> list['Door']:
         statement = (
@@ -28,7 +30,8 @@ class DoorLookup:
         if len(self._door_ids) > 0:
             statement = statement.where(DEV.ID.in_(self._door_ids))
 
-        dev = self._session.scalars(statement).all()
+        with self._lock:
+            dev = self._session.scalars(statement).all()
         return [Door(self._lookup_info, d.ID) for d in dev]
 
     def by_id(self, id_: int) -> Optional['Door']:
@@ -61,7 +64,8 @@ class DoorLookup:
         if len(self._door_ids) > 0:
             statement = statement.where(DEV.ID.in_(self._door_ids))
 
-        dev = self._session.scalar(statement)
+        with self._lock:
+            dev = self._session.scalar(statement)
         return Door(self._lookup_info, dev.ID) if dev is not None else None
 
 
