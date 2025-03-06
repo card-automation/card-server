@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Union
 
 import requests
 from sqlalchemy import select
@@ -12,7 +12,7 @@ from card_automation_server.windsx.engines import AcsEngine
 from card_automation_server.workers.events import AcsDatabaseUpdated, CommServerRestartRequested
 from card_automation_server.workers.utils import EventsWorker
 
-_Events = [
+_Events = Union[
     AcsDatabaseUpdated
 ]
 

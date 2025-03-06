@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Union
 
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from card_automation_server.windsx.engines import LogEngine
 from card_automation_server.workers.events import LogDatabaseUpdated, CardScanned, RawCommServerMessage
 from card_automation_server.workers.utils import EventsWorker
 
-_Events = [
+_Events = Union[
     LogDatabaseUpdated,
     RawCommServerMessage,
 ]

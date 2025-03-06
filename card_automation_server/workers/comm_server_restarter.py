@@ -2,7 +2,7 @@ import os
 import signal
 import subprocess
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Union
 
 import psutil
 from sentry_sdk import capture_exception
@@ -11,7 +11,7 @@ from card_automation_server.config import Config
 from card_automation_server.workers.events import CommServerRestartRequested
 from card_automation_server.workers.utils import EventsWorker
 
-_Events = [
+_Events = Union[
     CommServerRestartRequested
 ]
 
