@@ -67,6 +67,7 @@ class WorkerEventLoop(EventsWorker[Any]):
                     self._event_to_workers[arg] = []
 
                 self._event_to_workers[arg].append(worker)
+                self._log.debug(f"Will send event type {arg} to {worker.__class__.__name__}")
 
         self._worker_threads.append(_WorkerMonitorThread(self, worker))
 
