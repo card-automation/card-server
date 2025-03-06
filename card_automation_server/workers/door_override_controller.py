@@ -45,10 +45,13 @@ class DoorOverrideController(EventsWorker[_Events]):
     def _handle_door_state_update(self, event: DoorStateUpdate):
         self._set_state_with_retries(event.location_id, event.device_id, event.state)
 
+        item = event.location_id, event.device_id
         if event.timeout is not None:
             now = datetime.now()
             then = now + event.timeout
-            self._timeout_map[event.location_id, event.device_id] = then
+            self._timeout_map[item] = then
+        elif item in self._timeout_map:
+            del self._timeout_map[item]
 
     def _set_state_with_retries(self,
                                 location_id: int,
