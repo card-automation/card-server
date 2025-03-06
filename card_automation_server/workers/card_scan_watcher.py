@@ -30,9 +30,10 @@ class CardScanWatcher(EventsWorker[_Events]):
     def _handle_event(self, event: _Events):
         if isinstance(event, LogDatabaseUpdated):
             self._handle_log_database_update(event)
-
-        if isinstance(event, RawCommServerMessage):
+        elif isinstance(event, RawCommServerMessage):
             self._handle_raw_comm_server_message(event)
+        else:
+            self._log.debug(f"Got an event we don't know how to handle for some reason {type(event)}")
 
     def _handle_log_database_update(self, _: LogDatabaseUpdated):
         latest_events = self.db_session.scalars(
@@ -64,6 +65,8 @@ class CardScanWatcher(EventsWorker[_Events]):
             self._last_timestamp = max(self._last_timestamp, event.TimeDate)
 
     def _handle_raw_comm_server_message(self, message: RawCommServerMessage):
+        self._log.debug(f"Message data: {message.data}")
+
         if message.type != 1:
             self._log.debug("Message wasn't our type")
             return  # We only handle log events for card scans
