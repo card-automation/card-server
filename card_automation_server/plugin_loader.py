@@ -47,7 +47,9 @@ class PluginLoader:
         self._sub_resolver.singleton(ConfigPath, self._plugin_config.config_path)
         self._sub_resolver.singleton(LogPath, self._plugin_config.log_path)
 
-        doors = self._config.windsx.common_doors if self._config.windsx.common_doors is not None else []
+        # Start with an empty list and extend it to avoid accidentally modifying the config object
+        doors = []
+        doors.extend(self._config.windsx.common_doors.copy() if self._config.windsx.common_doors is not None else [])
         doors.extend(self._plugin_config.doors if self._plugin_config.doors is not None else [])
         door_lookup = DoorLookup(resolver(LookupInfo), *doors)
         self._sub_resolver.singleton(door_lookup)
