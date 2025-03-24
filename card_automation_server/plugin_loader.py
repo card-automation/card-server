@@ -50,7 +50,7 @@ class PluginLoader:
         # Start with an empty list and extend it to avoid accidentally modifying the config object
         doors = []
         doors.extend(self._config.windsx.common_doors.copy() if self._config.windsx.common_doors is not None else [])
-        doors.extend(self._plugin_config.doors if self._plugin_config.doors is not None else [])
+        doors.extend(self._plugin_config.doors.copy() if self._plugin_config.doors is not None else [])
         door_lookup = DoorLookup(resolver(LookupInfo), *doors)
         self._sub_resolver.singleton(door_lookup)
 
