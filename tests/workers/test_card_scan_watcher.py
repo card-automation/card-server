@@ -1,8 +1,10 @@
 from datetime import datetime
 
 import pytest
+from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
+from card_automation_server.config import Config
 from card_automation_server.ioc import Resolver
 from card_automation_server.plugins.types import CardScanEventType
 from card_automation_server.windsx.db.models import EvnLog
@@ -12,7 +14,13 @@ from tests.conftest import main_location_id
 
 
 @pytest.fixture
-def card_scan_watcher(resolver: Resolver):
+def card_scan_watcher(
+        resolver: Resolver,
+        # These aren't used directly, but are type hinted for the resolver's sake
+        app_config: Config,
+        acs_data_engine: Engine,
+        log_engine: Engine
+):
     watcher = resolver.singleton(CardScanWatcher)
 
     watcher.start()

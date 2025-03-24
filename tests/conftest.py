@@ -1,6 +1,6 @@
 from datetime import date
 from pathlib import Path
-from typing import Generator
+from typing import Generator, Callable, Optional
 from unittest.mock import Mock, MagicMock
 
 import pytest
@@ -8,6 +8,7 @@ from _pytest.fixtures import FixtureRequest
 from platformdirs import PlatformDirs
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
+from typing_extensions import TypeVar
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 from card_automation_server.config import Config
@@ -419,12 +420,18 @@ def log_db_path(db_is_file: Path) -> Path:
     return db_is_file / "Log.db"
 
 
+T = TypeVar('T')
+
+def if_resolved_value(request: FixtureRequest, fixture: Callable[..., T]) -> Optional[T]:
+    name = fixture.__name__
+    if name in request.fixturenames:
+        return request.getfixturevalue(name)
+    return None
+
 @pytest.fixture
 def acs_data_engine(request: FixtureRequest) -> Engine:
     # noinspection PyTestUnpassedFixture
-    acs_db_path_name = acs_db_path.__name__
-    if acs_db_path_name in request.fixturenames:
-        db_path: Path = request.getfixturevalue(acs_db_path_name)
+    if db_path := if_resolved_value(request, acs_db_path):
         db_path.touch()
         engine = EngineFactory.file_sqlite(db_path)
     else:
@@ -567,12 +574,20 @@ def app_config(tmp_path: Path) -> Config:
 
 @pytest.fixture
 def resolver(
-        app_config: Config,
-        acs_data_engine: Engine,
-        log_engine: Engine
+        request: FixtureRequest,
 ) -> Resolver:
     resolver = Resolver()
-    resolver.singleton(Config, app_config)
-    resolver.singleton(AcsEngine, acs_data_engine)
-    resolver.singleton(LogEngine, log_engine)
+
+    # noinspection PyTestUnpassedFixture
+    if instance := if_resolved_value(request, app_config):
+        resolver.singleton(Config, instance)
+
+    # noinspection PyTestUnpassedFixture
+    if instance := if_resolved_value(request, acs_data_engine):
+        resolver.singleton(AcsEngine, instance)
+
+    # noinspection PyTestUnpassedFixture
+    if instance := if_resolved_value(request, log_engine):
+        resolver.singleton(LogEngine, instance)
+
     return resolver
