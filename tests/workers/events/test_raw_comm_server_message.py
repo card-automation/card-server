@@ -32,3 +32,10 @@ class TestRawCommServerMessageParsing:
         assert isinstance(message, RawCommServerMessage)
         assert message.data == [1, 2, 3, 4, "test"]
         assert message.type == 1
+
+    def test_parsing_with_multiple_asterisks(self):
+        message = RawCommServerMessage.parse("1 2 3 4 *test *this*\r\n")
+
+        assert isinstance(message, RawCommServerMessage)
+        assert message.data == [1, 2, 3, 4, "test *this*"]
+        assert message.type == 1

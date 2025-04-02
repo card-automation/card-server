@@ -119,8 +119,9 @@ class RawCommServerMessage(WorkerEvent):
             raise MessageParseException("Cannot parse empty string")
 
         if '*' in packet:
-            left, right = packet.split('*')
-            left = left.strip(' ')
+            star_index = packet.index('*')
+            left = packet[:star_index].strip(' ')
+            right = packet[star_index+1:].strip(' ')
         else:
             left, right = packet, None
 
