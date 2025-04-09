@@ -1,4 +1,5 @@
 import threading
+from logging import Logger
 from queue import Empty
 from typing import Any
 
@@ -9,9 +10,11 @@ from card_automation_server.workers.utils import Worker, EventsWorker
 
 class _WorkerMonitorThread:
     def __init__(self,
+                 logger: Logger,
                  event_loop: 'WorkerEventLoop',
                  worker: Worker
                  ):
+        self._log = logger
         self._event_loop = event_loop
         self._worker = worker
         self.stop_running = threading.Event()
@@ -33,6 +36,7 @@ class _WorkerMonitorThread:
 
         # We're done now, the worker can be stopped
         self._worker.stop(30)
+        self._log.info(f"Stopped process {self._worker.__class__}")
 
 
 class WorkerEventLoop(EventsWorker[Any]):
