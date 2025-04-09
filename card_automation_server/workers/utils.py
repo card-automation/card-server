@@ -233,7 +233,6 @@ class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
             if path not in self._files:
                 continue
 
-            self._log.debug(f"WE CARE ABOUT IT!")
             super().dispatch(event)
             return
 
