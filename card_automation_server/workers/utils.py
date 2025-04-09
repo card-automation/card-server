@@ -199,9 +199,12 @@ class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
         self._log = config.logger
         self._files: set[Path] = set(f.absolute() for f in files)
 
+        for file in self._files:
+            self._log.debug(f"We care about file {file}")
+
         self._observer = Observer()
 
-        for path in self._get_observed_paths(*files):
+        for path in self._get_observed_paths(*self._files):
             self._log.debug(f"Watching file {path}")
             self._observer.schedule(self, path)
 
