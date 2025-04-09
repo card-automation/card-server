@@ -212,6 +212,10 @@ class BaseConfig(ConfigHolder, abc.ABC):
         if not self._config_path.exists():
             self.write()
 
+    @property
+    def config_path(self) -> Path:
+        return self._config_path
+
     def write(self):
         with self._config_path.open('w') as fh:
             tomlkit.dump(self._config, fh)

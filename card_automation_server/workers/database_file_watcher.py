@@ -1,55 +1,26 @@
 from pathlib import Path
-from typing import Optional
+from typing import Union
 
-from watchdog.events import FileSystemEventHandler, FileSystemEvent, FileModifiedEvent
-from watchdog.observers import Observer
+from watchdog.events import FileModifiedEvent, DirModifiedEvent
 
 from card_automation_server.config import Config
 from card_automation_server.workers.events import AcsDatabaseUpdated, LogDatabaseUpdated
-from card_automation_server.workers.utils import Worker
+from card_automation_server.workers.utils import FileWatcherWorker
 
 
-class DatabaseFileWatcher(Worker, FileSystemEventHandler):
+class DatabaseFileWatcher(FileWatcherWorker):
     def __init__(self,
                  config: Config
                  ):
-        super().__init__()
         self._acs_db_path = config.windsx.acs_data_db_path
         self._log_db_path = config.windsx.log_db_path
 
-        paths = self._get_observed_paths(
+        super().__init__(
             self._acs_db_path,
             self._log_db_path
         )
 
-        self._observer = Observer()
-        for path in paths:
-            self._observer.schedule(self, path)
-
-    @staticmethod
-    def _get_observed_paths(*paths: Path) -> list[Path]:
-        result = []
-
-        for path in paths:
-            parent = path.parent
-
-            if parent not in result:
-                result.append(parent)
-
-        return result
-
-    def start(self):
-        self._observer.start()
-
-    def stop(self, timeout: Optional[float] = None):
-        self._observer.stop()
-
-        self._observer.join(timeout)
-
-        if self._observer.is_alive():
-            raise Exception("Database file watcher thread timed out")
-
-    def on_modified(self, event: FileSystemEvent) -> None:
+    def on_modified(self, event: Union[FileModifiedEvent, DirModifiedEvent]) -> None:
         if not isinstance(event, FileModifiedEvent):
             return
 

@@ -145,15 +145,19 @@ class Config(BaseConfig):
     def __init__(self, dirs: PlatformDirs):
         self._platformdirs = dirs
 
-        config_root = dirs.user_config_path
-        config_root.mkdir(parents=True, exist_ok=True)
-        config_path = config_root / "config.toml"
+        self._config_root = dirs.user_config_path
+        self._config_root.mkdir(parents=True, exist_ok=True)
+        config_path = self._config_root / "config.toml"
 
-        log_root = config_root / "logs"
+        log_root = self._config_root / "logs"
         log_root.mkdir(parents=True, exist_ok=True)
         log_path: Path = log_root / "card-server.log"
 
         super().__init__(ConfigPath(config_path), LogPath(log_path))
+
+    @property
+    def config_root(self) -> Path:
+        return self._config_root
 
     def _manual_config_setup(self):
         if "plugins" not in self._config:

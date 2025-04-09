@@ -2,8 +2,12 @@ import abc
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from pathlib import Path
 from queue import Queue, Empty
 from typing import Optional, TypeVar, Generic, Callable
+
+from watchdog.events import FileSystemEventHandler, FileSystemEvent, FileModifiedEvent
+from watchdog.observers import Observer
 
 T = TypeVar('T')
 
@@ -185,3 +189,52 @@ class EventsWorker(ThreadedWorker[T]):
         requested to stop and there was no event, this method will not be called.
         """
         pass
+
+
+class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
+    def __init__(self, *files: Path):
+        super().__init__()
+        self._files: set[Path] = set(f.absolute() for f in files)
+
+        self._observer = Observer()
+
+        for path in self._get_observed_paths(*files):
+            self._observer.schedule(self, path)
+
+    @staticmethod
+    def _get_observed_paths(*paths: Path) -> set[Path]:
+        result = set()
+
+        for path in paths:
+            if path.is_file():
+                # We don't watch the file, we watch the directory.
+                path = path.parent
+
+            result.add(path)
+
+        return result
+
+    def dispatch(self, event: FileSystemEvent) -> None:
+        paths = []
+        if hasattr(event, "dest_path") and event.dest_path != "":
+            paths.append(event.dest_path)
+        if event.src_path:
+            paths.append(event.src_path)
+
+        for path in paths:
+            if path not in self._files:
+                continue
+
+            super().dispatch(event)
+            return
+
+    def start(self):
+        self._observer.start()
+
+    def stop(self, timeout: Optional[float] = None):
+        self._observer.stop()
+
+        self._observer.join(timeout)
+
+        if self._observer.is_alive():
+            raise Exception("Database file watcher thread timed out")
