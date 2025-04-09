@@ -5,7 +5,7 @@ import logging
 from logging import Logger
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import NewType, TypeVar, Generic, Optional, Union
+from typing import NewType, TypeVar, Generic, Optional, Union, Tuple
 
 import tomlkit
 import tomlkit.items
@@ -18,33 +18,81 @@ TomlConfigType = Union[tomlkit.TOMLDocument, tomlkit.items.Table]
 
 
 class ConfigProperty(Generic[T]):
-    def __init__(self, name: str, type_: type[T]):
+    def __init__(self, name: str,
+                 type_: type[T],
+                 default_value: Optional[T] = None):
         self._name = name
         self._type = type_
+        self._default_value = default_value
+
+    @staticmethod
+    def _base_and_arg_type(t) -> Tuple[type, Optional[type]]:
+        if hasattr(t, '__origin__') and hasattr(t, '__args__'):
+            return t.__origin__, t.__args__[0]
+
+        return t, None
+
+    @classmethod
+    def _from_serializable_type(cls, value, base_type, arg_type):
+        if base_type == Path:
+            return Path(value)
+
+        if isinstance(base_type, enum.EnumType):
+            return base_type(value)
+
+        if base_type == list:
+            if arg_type is None:
+                raise Exception(f"Cannot resolve argument type of {base_type} and it is required here")
+
+            new_base_type, new_arg_type = cls._base_and_arg_type(arg_type)
+            return [cls._from_serializable_type(x, new_base_type, new_arg_type) for x in value]
+
+
+        if base_type == set:
+            return set(value)
+
+        return value
 
     def __get__(self, instance, owner) -> Optional[T]:
         # noinspection PyProtectedMember
         config = instance._config
 
         if self._name not in config:
-            return None
-        raw_value = config[self._name]
+            return self._default_value
+        value = config[self._name]
 
-        if self._type == Path:
-            return Path(raw_value)
-        if isinstance(self._type, enum.EnumType):
-            return self._type(raw_value)
+        base_type, arg_type = self._base_and_arg_type(self._type)
 
-        return raw_value
+        return self._from_serializable_type(value, base_type, arg_type)
+
+    @classmethod
+    def _to_serializable_type(cls, value: Optional[T], base_type, arg_type):
+        if base_type == Path:
+            return str(value)
+
+        if isinstance(base_type, enum.EnumType):
+            return value.value
+
+        if base_type == set:
+            value = list(value)
+
+        if type(value) == list:
+            if arg_type is None:
+                raise Exception(f"Cannot resolve argument type of {base_type} and it is required here")
+
+            new_base_type, new_arg_type = cls._base_and_arg_type(arg_type)
+            return [cls._to_serializable_type(x, new_base_type, new_arg_type) for x in value]
+
+        return value
 
     def __set__(self, instance, value: Optional[T]):
         is_valid_type = True
-        if hasattr(self._type, '__origin__') and hasattr(self._type, '__args__'):
-            if not isinstance(value, self._type.__origin__):
+        base_type, arg_type = self._base_and_arg_type(self._type)
+        if self._type != base_type:
+            if not isinstance(value, base_type):
                 is_valid_type = False
             else:
-                arg = self._type.__args__[0]
-                if not all(isinstance(x, arg) for x in value):
+                if not all(isinstance(x, arg_type) for x in value):
                     is_valid_type = False
         elif not isinstance(value, self._type):
             is_valid_type = False
@@ -59,10 +107,7 @@ class ConfigProperty(Generic[T]):
             del config[self._name]
             return
 
-        if self._type == Path:
-            value = str(value)
-
-        config[self._name] = value
+        config[self._name] = self._to_serializable_type(value, base_type, arg_type)
 
 
 class ConfigHolder(abc.ABC):
@@ -76,25 +121,33 @@ class ConfigHolder(abc.ABC):
             if attr_name.startswith('_'):
                 continue
 
-            if hasattr(self, attr_name):
-                continue  # It's already been defined, so we ignore it.
+            is_config_property = hasattr(attr_type, '__origin__') and attr_type.__origin__ == ConfigProperty
+            is_config_holder = inspect.isclass(attr_type) and ConfigHolder in inspect.getmro(attr_type)
 
-            if inspect.isclass(attr_type):
-                mro = inspect.getmro(attr_type)
+            if is_config_holder:
+                if hasattr(self, attr_name):
+                    continue  # ConfigHolder's that are already defined get ignored
 
-                if ConfigHolder in mro:
-                    if attr_name not in self._config:
-                        self._config[attr_name] = tomlkit.table()
+                if attr_name not in self._config:
+                    self._config[attr_name] = tomlkit.table()
 
-                    setattr(self, attr_name, attr_type(self._config[attr_name]))
-                else:
-                    continue  # It was a class, but not a config holder. Not ours to mess with.
-            elif hasattr(attr_type, '__origin__') and attr_type.__origin__ == ConfigProperty:
+                setattr(self, attr_name, attr_type(self._config[attr_name]))
+            elif is_config_property and hasattr(attr_type, '__args__'):
+                # If it has __origin__, it has __args__. The hasattr check is to get the linter to be quiet.
                 args = attr_type.__args__
                 if len(args) != 1:
                     raise Exception("Config property must have exactly one argument type")
 
-                setattr(self.__class__, attr_name, ConfigProperty(attr_name, args[0]))
+                default_value = None
+                if hasattr(self, attr_name):
+                    default_value = getattr(self, attr_name)
+
+                # First set the descriptor instance
+                config_property = ConfigProperty(attr_name, args[0], default_value)
+                setattr(self.__class__, attr_name, config_property)
+                # Then set the value of that descriptor
+                if default_value is not None:
+                    setattr(self, attr_name, default_value)
 
     def __repr__(self):
         return repr(self._config)
