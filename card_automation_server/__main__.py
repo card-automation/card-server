@@ -24,6 +24,7 @@ from card_automation_server.workers.database_file_watcher import DatabaseFileWat
 from card_automation_server.workers.door_override_controller import DoorOverrideController
 from card_automation_server.workers.dsx_hardware_reset_worker import DSXHardwareResetWorker
 from card_automation_server.workers.github_watcher import GitHubWatcher
+from card_automation_server.workers.restart_file_watcher import RestartFileWatcher
 from card_automation_server.workers.update_callback_watcher import UpdateCallbackWatcher
 from card_automation_server.workers.worker_event_loop import WorkerEventLoop
 
@@ -81,7 +82,9 @@ class CardAutomationServer:
             # Check for updates to the app/plugins
             self._resolver.singleton(GitHubWatcher),
             # Handle raw Comm Server traffic
-            self._resolver.singleton(CommServerSocketListener)
+            self._resolver.singleton(CommServerSocketListener),
+            # Allow the server to be restarted with a file
+            self._resolver.singleton(RestartFileWatcher),
         )
 
         self._logger.info("Main application loaded")

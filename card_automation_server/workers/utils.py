@@ -224,9 +224,9 @@ class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
     def dispatch(self, event: FileSystemEvent) -> None:
         paths = []
         if hasattr(event, "dest_path") and event.dest_path != "":
-            paths.append(event.dest_path)
+            paths.append(Path(event.dest_path))
         if event.src_path:
-            paths.append(event.src_path)
+            paths.append(Path(event.src_path))
 
         for path in paths:
             self._log.debug(f"File updated {path}")
