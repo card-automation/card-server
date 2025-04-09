@@ -9,6 +9,8 @@ from typing import Optional, TypeVar, Generic, Callable
 from watchdog.events import FileSystemEventHandler, FileSystemEvent, FileModifiedEvent
 from watchdog.observers import Observer
 
+from card_automation_server.config import Config
+
 T = TypeVar('T')
 
 
@@ -192,13 +194,15 @@ class EventsWorker(ThreadedWorker[T]):
 
 
 class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
-    def __init__(self, *files: Path):
+    def __init__(self, config: Config, *files: Path):
         super().__init__()
+        self._log = config.logger
         self._files: set[Path] = set(f.absolute() for f in files)
 
         self._observer = Observer()
 
         for path in self._get_observed_paths(*files):
+            self._log.debug(f"Watching file {path}")
             self._observer.schedule(self, path)
 
     @staticmethod
@@ -222,9 +226,11 @@ class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
             paths.append(event.src_path)
 
         for path in paths:
+            self._log.debug(f"File updated {path}")
             if path not in self._files:
                 continue
 
+            self._log.debug(f"WE CARE ABOUT IT!")
             super().dispatch(event)
             return
 

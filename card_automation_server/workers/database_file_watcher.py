@@ -16,6 +16,7 @@ class DatabaseFileWatcher(FileWatcherWorker):
         self._log_db_path = config.windsx.log_db_path
 
         super().__init__(
+            config,
             self._acs_db_path,
             self._log_db_path
         )

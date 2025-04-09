@@ -18,6 +18,7 @@ class RestartFileWatcher(FileWatcherWorker):
         ]
 
         super().__init__(
+            config,
             *self._force_restart_files,
         )
 
