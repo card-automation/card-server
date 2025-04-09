@@ -213,11 +213,7 @@ class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
         result = set()
 
         for path in paths:
-            if path.is_file():
-                # We don't watch the file, we watch the directory.
-                path = path.parent
-
-            result.add(path)
+            result.add(path.parent)
 
         return result
 
