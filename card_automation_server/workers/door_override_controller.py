@@ -16,6 +16,7 @@ class DoorOverrideController(EventsWorker[_Events]):
     def __init__(self,
                  config: Config,
                  ):
+        self._log = config.logger
         self._workstation_number = config.windsx.workstation_number
         self._comm_server_host = config.windsx.cs_host
         self._comm_server_port = config.windsx.cs_port
@@ -62,12 +63,15 @@ class DoorOverrideController(EventsWorker[_Events]):
                 return True
 
             time.sleep(0.5)  # Pause between retries
+
+        self._log.info(f"Failed to open door ({location_id}, {door_number})")
         return False
 
     def _set_state_internal(self,
                             location_id: int,
                             door_number: int,
                             state: DoorState) -> bool:
+        self._log.info(f"Setting door ({location_id}, {door_number} to {state.name})")
         state_map = {
             DoorState.OPEN: 1,
             DoorState.SECURE: 2,

@@ -225,7 +225,6 @@ class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
             paths.append(Path(event.src_path))
 
         for path in paths:
-            self._log.debug(f"File updated {path}")
             if path not in self._files:
                 continue
 
@@ -236,6 +235,9 @@ class FileWatcherWorker(Worker, FileSystemEventHandler, abc.ABC):
         self._observer.start()
 
     def stop(self, timeout: Optional[float] = None):
+        if not self._observer.is_alive():
+            return  # Can't kill what isn't living
+
         self._observer.stop()
 
         self._observer.join(timeout)

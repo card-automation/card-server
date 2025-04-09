@@ -1,7 +1,6 @@
 from pathlib import Path
-from typing import Union
 
-from watchdog.events import FileCreatedEvent, DirCreatedEvent
+from watchdog.events import FileSystemEvent
 
 from card_automation_server.config import Config
 from card_automation_server.workers.events import ApplicationRestartNeeded
@@ -22,11 +21,9 @@ class RestartFileWatcher(FileWatcherWorker):
             *self._force_restart_files,
         )
 
-    def on_created(self, event: Union[FileCreatedEvent, DirCreatedEvent]) -> None:
-        if not isinstance(event, FileCreatedEvent):
-            return
-
+    def on_any_event(self, event: FileSystemEvent) -> None:
+        # We only listen for our restart files, so this should be safe enough.
         event_path: Path = Path(event.src_path)
-        self._log.info(f"File found suggesting we should restart: {event_path}")
+        self._log.info(f"File {event.event_type} suggesting we should restart: {event_path}")
         event_path.unlink()
         self._outbound_event_queue.put(ApplicationRestartNeeded())
