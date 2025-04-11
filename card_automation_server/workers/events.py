@@ -1,10 +1,11 @@
 import abc
 import enum
+import typing
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Optional, Union
 
-from card_automation_server.plugins.types import CardScan
+from card_automation_server.plugins.types import CardScan, CommServerMessageType, CommServerEventType
 from card_automation_server.windsx.lookup.access_card import AccessCard
 
 
@@ -95,7 +96,7 @@ class DoorState(enum.Enum):
 @dataclass(frozen=True)
 class DoorStateUpdate(WorkerEvent):
     location_id: int
-    device_id: int
+    door_number: int
     state: DoorState
     timeout: Optional[timedelta]
 
@@ -106,6 +107,61 @@ class ApplicationRestartNeeded(WorkerEvent):
 
 class MessageParseException(Exception):
     pass
+
+
+class RawCommServerEvent(WorkerEvent):
+    def __init__(self, data: list[Union[int, str]]):
+        self._data = data
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def timestamp(self) -> datetime:
+        return datetime(
+            year=self.data[10],
+            month=self.data[11],
+            day=self.data[12],
+            hour=self.data[13],
+            minute=self.data[14],
+            second=self.data[15],
+        )
+
+    @property
+    def type(self) -> CommServerEventType:
+        return CommServerEventType(self.data[6])
+
+    def is_any_event(self, *event_types: CommServerEventType) -> bool:
+        event_types = list(self._unwrap_nested_event_types(list(event_types)))
+
+        for _type in event_types:
+            if self._data[6] == _type:
+                return True
+
+        return False
+
+    @staticmethod
+    def _unwrap_nested_event_types(event_types: list[CommServerEventType]):
+        for _type in event_types:
+            could_not_handle = False
+
+            if isinstance(_type, CommServerEventType):
+                yield _type
+            elif hasattr(_type, "__origin__") and hasattr(_type, "__args__"):
+                origin = _type.__origin__
+                args = _type.__args__
+
+                if origin == typing.Literal:
+                    for arg in args:
+                        yield arg
+                else:
+                    could_not_handle = True
+            else:
+                could_not_handle = True
+
+            if could_not_handle:
+                raise Exception(f"Unsure how to handle event type: {type(_type)}")
 
 
 class RawCommServerMessage(WorkerEvent):
@@ -121,7 +177,7 @@ class RawCommServerMessage(WorkerEvent):
         if '*' in packet:
             star_index = packet.index('*')
             left = packet[:star_index].strip(' ')
-            right = packet[star_index+1:].strip(' ')
+            right = packet[star_index + 1:].strip(' ')
         else:
             left, right = packet, None
 
@@ -142,3 +198,13 @@ class RawCommServerMessage(WorkerEvent):
     @property
     def type(self) -> int:
         return self._data[0]
+
+    def is_type(self, _type: CommServerMessageType) -> bool:
+        return self.type == _type
+
+    @property
+    def event(self) -> Optional[RawCommServerEvent]:
+        if not self.is_type(CommServerMessageType.EVENT):
+            return None
+
+        return RawCommServerEvent(self._data)

@@ -114,7 +114,7 @@ class Door(DbModel):
     def open(self, timeout: Optional[timedelta] = None):
         self._lookup_info.updated_callback(DoorStateUpdate(
             location_id=self.location_id,
-            device_id=self.device_id,
+            door_number=self.device_id,
             state=DoorState.OPEN,
             timeout=timeout
         ))
@@ -122,7 +122,7 @@ class Door(DbModel):
     def secure(self, timeout: Optional[timedelta] = None):
         self._lookup_info.updated_callback(DoorStateUpdate(
             location_id=self.location_id,
-            device_id=self.device_id,
+            door_number=self.device_id,
             state=DoorState.SECURE,
             timeout=timeout
         ))
@@ -130,7 +130,7 @@ class Door(DbModel):
     def timezone(self):
         self._lookup_info.updated_callback(DoorStateUpdate(
             location_id=self.location_id,
-            device_id=self.device_id,
+            door_number=self.device_id,
             state=DoorState.TIMEZONE,
             timeout=None
         ))

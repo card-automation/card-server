@@ -1,15 +1,18 @@
 import socket
-import time
-from datetime import datetime
-from typing import Union
+from datetime import datetime, timedelta
+from typing import Union, Tuple
 
 from card_automation_server.config import Config
-from card_automation_server.workers.events import DoorStateUpdate, DoorState
+from card_automation_server.plugins.types import DoorOverrideEvent, CommServerEventType
+from card_automation_server.workers.events import DoorStateUpdate, DoorState, RawCommServerEvent
 from card_automation_server.workers.utils import EventsWorker
 
 _Events = Union[
-    DoorStateUpdate
+    DoorStateUpdate,
+    RawCommServerEvent,
 ]
+
+LocationDoor = Tuple[int, int]
 
 
 class DoorOverrideController(EventsWorker[_Events]):
@@ -21,7 +24,9 @@ class DoorOverrideController(EventsWorker[_Events]):
         self._comm_server_host = config.windsx.cs_host
         self._comm_server_port = config.windsx.cs_port
 
-        self._timeout_map: dict[(int, int), datetime] = {}
+        self._timeout_map: dict[LocationDoor, datetime] = {}
+        self._pending_updates: dict[LocationDoor, DoorState] = {}
+        self._last_update_time: dict[LocationDoor, datetime] = {}
 
         super().__init__()
 
@@ -30,48 +35,57 @@ class DoorOverrideController(EventsWorker[_Events]):
         # must use an actual timestamp for comparison instead of number of seconds.
         now = datetime.now()
 
-        for (location_id, door_number), timezone_at in self._timeout_map.copy().items():
+        for location_door, timezone_at in self._timeout_map.copy().items():
             if now < timezone_at:
                 continue
 
-            self._set_state_with_retries(location_id, door_number, DoorState.TIMEZONE)
-            del self._timeout_map[location_id, door_number]
+            del self._timeout_map[location_door]
+            self._set_state(location_door, DoorState.TIMEZONE)
 
-            time.sleep(0.5)  # Just in case we're closing multiple doors in a row in quick succession
+        # This should be the only place that's calling _send_state directly. Everywhere else should be calling
+        # _set_state and waiting for this to check our pending updates.
+        now = datetime.now()
+        for location_door, state in self._pending_updates.items():
+            past_time = now - timedelta(seconds=5)
+            if (
+                    location_door not in self._last_update_time
+                    or self._last_update_time[location_door] < past_time
+            ):
+                self._send_state(location_door, state)
 
     def _handle_event(self, event: _Events):
         if isinstance(event, DoorStateUpdate):
             self._handle_door_state_update(event)
 
-    def _handle_door_state_update(self, event: DoorStateUpdate):
-        self._set_state_with_retries(event.location_id, event.device_id, event.state)
+        if isinstance(event, RawCommServerEvent):
+            self._handle_comm_server_event(event)
 
-        item = event.location_id, event.device_id
+    def _handle_door_state_update(self, event: DoorStateUpdate):
+        location_door: LocationDoor = event.location_id, event.door_number
+        self._set_state(location_door, event.state)
+
         if event.timeout is not None:
             now = datetime.now()
             then = now + event.timeout
-            self._timeout_map[item] = then
-        elif item in self._timeout_map:
-            del self._timeout_map[item]
+            self._timeout_map[location_door] = then
+        elif location_door in self._timeout_map:
+            del self._timeout_map[location_door]
 
-    def _set_state_with_retries(self,
-                                location_id: int,
-                                door_number: int,
-                                state: DoorState) -> bool:
-        for i in range(2):  # Try up to 2 times
-            if self._set_state_internal(location_id, door_number, state):
-                return True
+    def _set_state(self,
+                   location_door: LocationDoor,
+                   state: DoorState) -> None:
+        self._pending_updates[location_door] = state
+        if location_door in self._last_update_time:
+            del self._last_update_time[location_door]
 
-            time.sleep(0.5)  # Pause between retries
+    def _send_state(self,
+                    location_door: LocationDoor,
+                    state: DoorState) -> None:
+        # Just in case this call fails, we'll try to get it back into this state in the future
+        self._pending_updates[location_door] = state
+        self._last_update_time[location_door] = datetime.now()
 
-        self._log.info(f"Failed to open door ({location_id}, {door_number})")
-        return False
-
-    def _set_state_internal(self,
-                            location_id: int,
-                            door_number: int,
-                            state: DoorState) -> bool:
-        self._log.info(f"Setting door ({location_id}, {door_number} to {state.name})")
+        self._log.info(f"Setting door ({location_door}) to {state.name}")
         state_map = {
             DoorState.OPEN: 1,
             DoorState.SECURE: 2,
@@ -87,8 +101,8 @@ class DoorOverrideController(EventsWorker[_Events]):
             s.sendall(" ".join([
                 "6",  # Pretty sure this is the command id
                 str(self._workstation_number),
-                str(location_id),
-                str(door_number),
+                str(location_door[0]),
+                str(location_door[1]),
                 "0",  # Unsure what this is for
                 str(state_map[state]),
                 "3830202337",  # No idea where this value comes from
@@ -99,10 +113,66 @@ class DoorOverrideController(EventsWorker[_Events]):
             s.shutdown(socket.SHUT_WR)  # We're done writing, now to listen
 
             response: str = s.recv(1024).decode('ascii')
-            if len(response) == 0:
-                return False
-
-            if response == "\r\n":
-                return True
+            if len(response) == 0 or response == "\r\n":
+                return
 
             raise Exception(f"Unexpected Comm Server response: {response}")
+
+    def _handle_comm_server_event(self, event: RawCommServerEvent):
+        if not event.is_any_event(DoorOverrideEvent):
+            return
+
+        location_id = event.data[2]
+        door_number = event.data[3]
+        location_door: LocationDoor = (location_id, door_number)
+        self._handle_door_override(location_door, event.type)
+
+    def _handle_door_override(self,
+                              location_door: LocationDoor,
+                              event_type: CommServerEventType
+                              ):
+        if location_door not in self._pending_updates:
+            return
+
+        single_door_overrides: dict[DoorOverrideEvent, DoorState] = {
+            CommServerEventType.OPR_SET_OUTPUT_SECURE: DoorState.SECURE,
+            CommServerEventType.OPR_SET_OUTPUT_OPEN: DoorState.OPEN,
+            CommServerEventType.OPR_SET_OUTPUT_TZ: DoorState.TIMEZONE,
+        }
+
+        if event_type in single_door_overrides:
+            wanted_state: DoorState = self._pending_updates[location_door]
+            updated_state: DoorState = single_door_overrides[event_type]
+
+            if wanted_state == updated_state:
+                # Yay, we did it!
+                if location_door in self._pending_updates:
+                    del self._pending_updates[location_door]
+                return
+
+            # The operator overrode whatever state we were trying to get to. We ignore whatever timeout we had and make
+            # sure we're not trying to switch it back to something else
+            if location_door in self._pending_updates:
+                del self._pending_updates[location_door]
+            if location_door in self._timeout_map:
+                del self._timeout_map[location_door]
+            return
+
+        # Multiple event -> single door event
+        multiple_door_overrides: dict[DoorOverrideEvent, DoorOverrideEvent] = {
+            CommServerEventType.OPR_SET_OUTPUT_ALL_OPEN: DoorOverrideEvent.OPR_SET_OUTPUT_OPEN,
+            CommServerEventType.OPR_SET_OUTPUT_ALL_TIME_ZONE: DoorOverrideEvent.OPR_SET_OUTPUT_OPEN,
+        }
+
+        if event_type in multiple_door_overrides:
+            # Let's apply the single override to every door we know or care about
+            single_override = multiple_door_overrides[event_type]
+            for location_door in self._pending_updates.keys():
+                self._handle_door_override(location_door, single_override)
+
+            for location_door in self._timeout_map.keys():
+                self._handle_door_override(location_door, single_override)
+
+            return
+
+        raise Exception(f"Unexpected event type {event_type}")

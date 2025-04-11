@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from card_automation_server.config import Config
 from card_automation_server.ioc import Resolver
-from card_automation_server.plugins.types import CardScanEventType
+from card_automation_server.plugins.types import CommServerEventType
 from card_automation_server.windsx.db.models import EvnLog
 from card_automation_server.workers.card_scan_watcher import CardScanWatcher
 from card_automation_server.workers.events import CardScanned, LogDatabaseUpdated
@@ -36,7 +36,7 @@ class TestCardScanWatcher:
         event_log_entry = EvnLog(
             TimeDate=scan_time,
             Loc=main_location_id,
-            Event=CardScanEventType.ACCESS_GRANTED.value,
+            Event=CommServerEventType.ACCESS_GRANTED.value,
             Dev=0,  # Main door
             IO=11,  # Company with access granted
             IOName="Main Door",
@@ -61,6 +61,6 @@ class TestCardScanWatcher:
         assert isinstance(event, CardScanned)
         assert event.card_scan.scan_time == scan_time
         assert event.card_scan.card_number == 3000
-        assert event.card_scan.event_type == CardScanEventType.ACCESS_GRANTED
+        assert event.card_scan.event_type == CommServerEventType.ACCESS_GRANTED
         assert event.card_scan.name_id == 101
         assert event.card_scan.device == 0

@@ -9,12 +9,10 @@ from platformdirs import PlatformDirs
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 from typing_extensions import TypeVar
-from watchdog.events import FileSystemEventHandler, FileSystemEvent
 
 from card_automation_server.config import Config
 from card_automation_server.ioc import Resolver
 from card_automation_server.plugins.interfaces import Plugin
-from card_automation_server.plugins.types import CardScanEventType
 from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.db.models import *
 from card_automation_server.windsx.engines import AcsEngine, LogEngine
@@ -22,6 +20,7 @@ from card_automation_server.windsx.lookup.access_card import AccessCardLookup, A
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
 from card_automation_server.windsx.lookup.person import PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.workers.events import CommServerEventType
 from card_automation_server.workers.plugin_worker import PluginWorker
 
 location_group_id = 3
@@ -472,7 +471,7 @@ def table_log(session: Session):
         EvnLog(
             TimeDate=datetime(2025, 1, 1),
             Loc=main_location_id,
-            Event=CardScanEventType.ACCESS_GRANTED.value,
+            Event=CommServerEventType.ACCESS_GRANTED.value,
             Dev=0,  # Main door
             IO=11,  # Company with access granted
             IOName="Main Door",

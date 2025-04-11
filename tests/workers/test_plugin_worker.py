@@ -7,7 +7,7 @@ import pytest
 
 from card_automation_server.plugins.interfaces import PluginStartup, PluginShutdown, PluginCardScanned, PluginLoop, \
     PluginCardDataPushed
-from card_automation_server.plugins.types import CardScan, CardScanEventType
+from card_automation_server.plugins.types import CardScan, CommServerEventType
 from card_automation_server.windsx.lookup.access_card import AccessCard, AccessCardLookup
 from card_automation_server.workers.events import AccessCardPushed, CardScanned
 from tests.conftest import PluginWorkerFactory, main_location_id
@@ -66,7 +66,7 @@ class TestPluginWorker:
             card_number=3000,
             scan_time=datetime.now(),
             device=0,
-            event_type=CardScanEventType.ACCESS_GRANTED,
+            event_type=CommServerEventType.ACCESS_GRANTED,
             location_id=main_location_id
         )
         event = CardScanned(
@@ -160,7 +160,7 @@ class TestPluginWorker:
             card_number=3000,
             scan_time=datetime.now(),
             device=0,
-            event_type=CardScanEventType.ACCESS_GRANTED,
+            event_type=CommServerEventType.ACCESS_GRANTED,
             location_id=main_location_id
         )
         event = CardScanned(card_scan)

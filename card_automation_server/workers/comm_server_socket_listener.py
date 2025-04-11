@@ -7,6 +7,7 @@ from logging.handlers import RotatingFileHandler
 from platformdirs import PlatformDirs
 
 from card_automation_server.config import Config
+from card_automation_server.plugins.types import CommServerMessageType
 from card_automation_server.workers.events import RawCommServerMessage
 from card_automation_server.workers.utils import ThreadedWorker
 
@@ -58,7 +59,12 @@ class CommServerSocketListener(ThreadedWorker[None]):
                     self._log.info("CS Socket caught up")
 
             for line in result:
-                self._outbound_event_queue.put(RawCommServerMessage.parse(line))
+                comm_server_message = RawCommServerMessage.parse(line)
+                self._outbound_event_queue.put(comm_server_message)
+
+                event = comm_server_message.event
+                if event is not None:
+                    self._outbound_event_queue.put(event)
 
             time.sleep(0.5)  # Tight loop, let us know about new events fast
 

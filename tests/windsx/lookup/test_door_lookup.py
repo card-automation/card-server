@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from unittest.mock import Mock
 
-from card_automation_server.plugins.types import CardScan, CardScanEventType
+from card_automation_server.plugins.types import CardScan, CommServerEventType
 from card_automation_server.windsx.lookup.door_lookup import DoorLookup, Door
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.events import DoorStateUpdate, DoorState
@@ -91,7 +91,7 @@ class TestDoorLookup:
             card_number=3000,
             scan_time=datetime.now(),
             device=3,
-            event_type=CardScanEventType.ACCESS_GRANTED,
+            event_type=CommServerEventType.ACCESS_GRANTED,
             location_id=main_location_id
         ))
 
@@ -107,7 +107,7 @@ class TestDoorLookup:
             card_number=3000,
             scan_time=datetime.now(),
             device=1,
-            event_type=CardScanEventType.ACCESS_GRANTED,
+            event_type=CommServerEventType.ACCESS_GRANTED,
             location_id=main_location_id
         ))
 
@@ -127,7 +127,7 @@ class TestDoorStateChanges:
 
         acs_updated_callback.assert_called_once_with(DoorStateUpdate(
             location_id=main_location_id,
-            device_id=1,
+            door_number=1,
             state=DoorState.OPEN,
             timeout=None
         ))
@@ -144,7 +144,7 @@ class TestDoorStateChanges:
 
         acs_updated_callback.assert_called_once_with(DoorStateUpdate(
             location_id=main_location_id,
-            device_id=1,
+            door_number=1,
             state=DoorState.OPEN,
             timeout=timedelta(seconds=5)
         ))
@@ -161,7 +161,7 @@ class TestDoorStateChanges:
 
         acs_updated_callback.assert_called_once_with(DoorStateUpdate(
             location_id=main_location_id,
-            device_id=1,
+            door_number=1,
             state=DoorState.SECURE,
             timeout=None
         ))
@@ -178,7 +178,7 @@ class TestDoorStateChanges:
 
         acs_updated_callback.assert_called_once_with(DoorStateUpdate(
             location_id=main_location_id,
-            device_id=1,
+            door_number=1,
             state=DoorState.SECURE,
             timeout=timedelta(seconds=5)
         ))
@@ -195,7 +195,7 @@ class TestDoorStateChanges:
 
         acs_updated_callback.assert_called_once_with(DoorStateUpdate(
             location_id=main_location_id,
-            device_id=1,
+            door_number=1,
             state=DoorState.TIMEZONE,
             timeout=None
         ))
