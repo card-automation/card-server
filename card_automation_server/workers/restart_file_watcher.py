@@ -22,8 +22,10 @@ class RestartFileWatcher(FileWatcherWorker):
         )
 
     def on_any_event(self, event: FileSystemEvent) -> None:
+        if event.event_type == "deleted":
+            return
         # We only listen for our restart files, so this should be safe enough.
         event_path: Path = Path(event.src_path)
         self._log.info(f"File {event.event_type} suggesting we should restart: {event_path}")
-        event_path.unlink()
+        event_path.unlink(missing_ok=True)
         self._outbound_event_queue.put(ApplicationRestartNeeded())
