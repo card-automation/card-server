@@ -27,16 +27,18 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
         self._data_signing = DataSigning(config.dsxpi.secret)
         self._session = Session(acs_engine)
         self._location_to_pending_timestamps: dict[int, datetime] = {}
+        self._next_allowed_reset: datetime = datetime.now()
 
         # Even if we don't see the AcsDatabaseUpdated event, we're going to manually check. Normally it should only take
         # max 40 seconds to update, so checking every minute and failing every 3 minute handles all the worst cases.
         self._call_every(timedelta(minutes=1), self._sync_locations_pending)
 
     def _post_event(self) -> None:
-        three_minutes_ago = datetime.now() - timedelta(minutes=3)
+        now = datetime.now()
+        three_minutes_ago = now - timedelta(minutes=3)
 
         for update_started_timestamp in self._location_to_pending_timestamps.values():
-            if three_minutes_ago > update_started_timestamp:
+            if three_minutes_ago > update_started_timestamp and now > self._next_allowed_reset:
                 self._reset()
 
     def _handle_event(self, event: _Events):
@@ -61,6 +63,8 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
                 del self._location_to_pending_timestamps[location_id]
 
     def _reset(self):
+        # Don't restart again any sooner than 10 minutes from now
+        self._next_allowed_reset = datetime.now() + timedelta(minutes=10)
         # Tell the hardware to restart
         signed_payload = self._data_signing.encode(10)
         url = f"{self._dsx_pi_host}/reset/{signed_payload}"
