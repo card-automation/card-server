@@ -16,6 +16,10 @@ class RestartFileWatcher(FileWatcherWorker):
             config.config_root / "restart",
         ]
 
+        # Let's just clean up these files, if they happen to already exist on server start.
+        for f in self._force_restart_files:
+            f.unlink(missing_ok=True)
+
         super().__init__(
             config,
             *self._force_restart_files,
