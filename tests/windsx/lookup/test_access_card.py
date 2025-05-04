@@ -462,9 +462,11 @@ class TestAccessCardWrite:
         ending_rows = acs_data_session.scalars(select(LocCards)).all()
         assert len(starting_rows) + 1 == len(ending_rows)
 
-        loc_cards = db_helper.loc_cards(5, main_location_id, 11)
-        assert loc_cards is not None
-        assert loc_cards.DlFlag == 0
+        main_loc_cards = db_helper.loc_cards(5, main_location_id, 11)
+        assert main_loc_cards is not None
+        # Technically this wasn't updated, but it's safer to tell the controller about it anyway and have the controller
+        # treat it as a no-op than for us to assume it would be a no-op.
+        assert main_loc_cards.DlFlag == 1
 
         new_loc_cards = None
         for ending_row in ending_rows:
@@ -497,14 +499,19 @@ class TestAccessCardWrite:
 
         assert ab_match or ba_match
 
-        assert acs_updated_callback.call_count == 2
-        # Called with new_loc_cards and access_card
+        assert acs_updated_callback.call_count == 3
+        # Called with new_loc_cards, access_card, and the original main loc_cards in the database.
         acs_updated_callback.assert_called_with(access_card)
-        loc_cards_calls = [x
+        loc_cards = [x.args[0]
                            for x in acs_updated_callback.call_args_list
                            if len(x.args) == 1 and isinstance(x.args[0], LocCards)]
-        assert len(loc_cards_calls) == 1
-        loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
+        assert len(loc_cards) == 2
+
+        # We only care about the new, non-main one
+        expected_loc_cards = [x for x in loc_cards if x.ID != main_loc_cards.ID]
+        assert len(expected_loc_cards) == 1
+
+        loc_cards_arg: LocCards = expected_loc_cards[0]
         assert loc_cards_arg.ID == new_loc_cards.ID
         assert loc_cards_arg.CardID == new_loc_cards.CardID
         assert loc_cards_arg.Loc == new_loc_cards.Loc
@@ -613,12 +620,40 @@ class TestAccessCardWrite:
             assert loc_cards_arg.CardID == loc_cards.CardID
             assert loc_cards_arg.Loc == loc_cards.Loc
 
+    def test_rewriting_with_existing_access_level_sets_locs_cards(self,
+                                                                  acs_updated_callback: Mock,
+                                                                  access_card_lookup: AccessCardLookup,
+                                                                  db_helper: DbHelper):
+        access_card: AccessCard = access_card_lookup.by_card_number(2004)
+
+        assert access_card.in_db
+        assert not access_card.active
+
+        access_card \
+            .with_access(_acl_name_main_building_access) \
+            .write()
+
+        assert acs_updated_callback.call_count == 2
+        # Second call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
+
+        card: CARDS = db_helper.card_by_id(access_card.id)
+        assert card.Status
+        loc_cards_calls = [x
+                           for x in acs_updated_callback.call_args_list
+                           if len(x.args) == 1 and isinstance(x.args[0], LocCards)]
+        assert len(loc_cards_calls) == 1
+        loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
+        assert loc_cards_arg.CardID == card.ID
+        assert loc_cards_arg.DlFlag == 1
+
     def test_writing_card_updates_location_table_to_download(self,
                                                              db_helper: DbHelper,
                                                              access_card_lookup: AccessCardLookup):
         # This is the same setup as test_writing_card_creates_needed_loc_cards_entries
         # We expect the main location not to need an update, because every step of the way the main building has had its
-        # DGRP, ACL, LocCards entries all pre-populated. The only side that got changed was the annex.
+        # DGRP, ACL, LocCards entries all pre-populated. The only side that got changed was the annex. However, since we
+        # always update all relevant LocCards entries, we update the main building too.
 
         main_building = db_helper.loc(main_location_id)
         assert main_building is not None
@@ -635,7 +670,12 @@ class TestAccessCardWrite:
             .write()
 
         main_building = db_helper.loc(main_location_id)
-        assert not main_building.PlFlag  # Still no updates for you
+        assert main_building.PlFlag
+        assert main_building.TzCs == 0
+        assert main_building.AclCs == 0
+        assert main_building.DGrpCs == 0
+        assert main_building.CodeCs == 0
+
         annex = db_helper.loc(annex_location_id)
         assert annex.PlFlag
         assert annex.TzCs == 0

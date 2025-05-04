@@ -393,12 +393,15 @@ def table_access_control_list(session: Session):
         ACL(ID=801, Loc=main_location_id, Acl=11, DGrp=3, Tz=1),
         # Tenant 3 annex access timezone 1 is created in the tests
         # Tenant 3 annex secret lab access timezone 3 is created in the tests
+        # Main Building access timezone 1
+        ACL(ID=802, Loc=main_location_id, Acl=12, DGrp=1, Tz=1),
     ])
 
 
 def table_location_cards(session: Session):
     session.add_all([
         LocCards(ID=900, CardID=5, Loc=main_location_id, Acl=11),
+        LocCards(ID=901, CardID=7, Loc=main_location_id, Acl=12),
     ])
 
 

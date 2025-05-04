@@ -380,8 +380,8 @@ class _AccessControlListUpdater:
             acl3 = acl_ids.pop() if acl_ids else -1
             acl4 = acl_ids.pop() if acl_ids else -1
 
-            if self.__set_loc_cards_acls(loc_cards, acl, acl1, acl2, acl3, acl4):
-                self._location_ids_to_update.add(location_id)
+            self.__set_loc_cards_acls(loc_cards, acl, acl1, acl2, acl3, acl4)
+            self._location_ids_to_update.add(location_id)
 
         return result
 
@@ -412,8 +412,8 @@ class _AccessControlListUpdater:
             if loc_cards is None:
                 continue
 
-            if self.__set_loc_cards_acls(loc_cards):
-                self._location_ids_to_update.add(location_id)
+            self.__set_loc_cards_acls(loc_cards)
+            self._location_ids_to_update.add(location_id)
 
     def __update_loc_cards_to_master(self):
         for location_id in self._locations:
@@ -429,11 +429,11 @@ class _AccessControlListUpdater:
                     CardID=self._card_id,
                 )
 
-            if self.__set_loc_cards_acls(
+            self.__set_loc_cards_acls(
                     loc_cards,
                     0  # This is what sets the Acl to master
-            ):
-                self._location_ids_to_update.add(location_id)
+            )
+            self._location_ids_to_update.add(location_id)
 
     def __set_loc_cards_acls(self,
                              loc_cards: LocCards,
@@ -442,9 +442,7 @@ class _AccessControlListUpdater:
                              acl2: int = -1,
                              acl3: int = -1,
                              acl4: int = -1
-                             ) -> bool:
-        something_changed = False
-
+                             ) -> None:
         acl_names = ["Acl", "Acl1", "Acl2", "Acl3", "Acl4"]
         acl_ids = [acl, acl1, acl2, acl3, acl4]
         for id_, name in zip(acl_ids, acl_names):
@@ -453,18 +451,14 @@ class _AccessControlListUpdater:
             if current_acl == id_:
                 continue
 
-            something_changed = True
             setattr(loc_cards, name, id_)
 
-        if something_changed:
-            # 2 means delete, 1 means update. If they're all "no access" of -1, then we just delete the row.
-            download = 2 if all(x == -1 for x in acl_ids) else 1
-            loc_cards.DlFlag = download
-            loc_cards.CkSum = 0
+        # 2 means delete, 1 means update. If they're all "no access" of -1, then we just delete the row.
+        download = 2 if all(x == -1 for x in acl_ids) else 1
+        loc_cards.DlFlag = download
+        loc_cards.CkSum = 0
 
-            self._session.add(loc_cards)
-            self._session.commit()
+        self._session.add(loc_cards)
+        self._session.commit()
 
-            self._update_callback(loc_cards)
-
-        return something_changed
+        self._update_callback(loc_cards)
