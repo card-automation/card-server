@@ -402,6 +402,7 @@ def table_location_cards(session: Session):
     session.add_all([
         LocCards(ID=900, CardID=5, Loc=main_location_id, Acl=11),
         LocCards(ID=901, CardID=7, Loc=main_location_id, Acl=12),
+        # 902 is used in test_updated_to_bad_location_are_ignored
     ])
 
 

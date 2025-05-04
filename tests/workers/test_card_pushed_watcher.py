@@ -252,7 +252,7 @@ class TestCardPushedWatcher:
                                                  card_pushed_watcher: CardPushedWatcher,
                                                  outbound_event_queue_empty: EmptyCallable):
         loc_cards: LocCards = LocCards(
-            ID=901,
+            ID=902,
             CardID=1001,
             Loc=bad_main_location_id
         )
