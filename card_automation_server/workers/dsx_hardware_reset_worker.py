@@ -47,22 +47,19 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
             self._sync_locations_pending()
 
     def _sync_locations_pending(self):
-        locations_pending = self._session.scalars(
-            select(LOC).where(LOC.PlFlag)
-        ).all()
+        locations_pending: set[int] = set(self._session.scalars(
+            select(LOC.Loc).where(LOC.PlFlag)
+        ).all())
 
-        for location in locations_pending:
-            location_id = location.Loc
-            is_downloading = location.PlFlag
-            self._log.debug(f"Location {location_id} has is_downloading {is_downloading} and ~ is {not is_downloading}")
-
-            # If we're downloading this location and aren't currently watching for this timestamp, start watching it
-            if is_downloading and location_id not in self._location_to_pending_timestamps:
-                self._location_to_pending_timestamps[location_id] = datetime.now()
-
+        for location_id in list(self._location_to_pending_timestamps.keys()):
             # If we aren't downloading anymore but were watching for this timestamp, stop watching it
-            if not is_downloading and location_id in self._location_to_pending_timestamps:
+            if location_id not in locations_pending:
                 del self._location_to_pending_timestamps[location_id]
+
+        for location_id in locations_pending:
+            # If we're downloading this location and aren't currently watching for this timestamp, start watching it
+            if location_id not in self._location_to_pending_timestamps:
+                self._location_to_pending_timestamps[location_id] = datetime.now()
 
     def _reset(self):
         # Don't restart again any sooner than 10 minutes from now
