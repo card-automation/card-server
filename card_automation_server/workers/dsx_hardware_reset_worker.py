@@ -1,4 +1,3 @@
-import logging
 from datetime import datetime, timedelta
 from typing import Union
 
@@ -24,6 +23,7 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
                  acs_engine: AcsEngine
                  ):
         super().__init__()
+        self._log = config.logger
         self._dsx_pi_host = config.dsxpi.host
         self._data_signing = DataSigning(config.dsxpi.secret)
         self._session = Session(acs_engine)
@@ -54,7 +54,7 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
         for location in locations_pending:
             location_id = location.Loc
             is_downloading = location.PlFlag
-            logging.debug(f"Location {location_id} has is_downloading {is_downloading} and ~ is {not is_downloading}")
+            self._log.debug(f"Location {location_id} has is_downloading {is_downloading} and ~ is {not is_downloading}")
 
             # If we're downloading this location and aren't currently watching for this timestamp, start watching it
             if is_downloading and location_id not in self._location_to_pending_timestamps:
