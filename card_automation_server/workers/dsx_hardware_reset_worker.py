@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from typing import Union
 
@@ -53,6 +54,7 @@ class DSXHardwareResetWorker(EventsWorker[_Events]):
         for location in locations_pending:
             location_id = location.Loc
             is_downloading = location.PlFlag
+            logging.debug(f"Location {location_id} has is_downloading {is_downloading} and ~ is {not is_downloading}")
 
             # If we're downloading this location and aren't currently watching for this timestamp, start watching it
             if is_downloading and location_id not in self._location_to_pending_timestamps:
