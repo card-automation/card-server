@@ -7,7 +7,6 @@ from logging.handlers import RotatingFileHandler
 from platformdirs import PlatformDirs
 
 from card_automation_server.config import Config
-from card_automation_server.plugins.types import CommServerMessageType
 from card_automation_server.workers.events import RawCommServerMessage
 from card_automation_server.workers.utils import ThreadedWorker
 
@@ -108,6 +107,8 @@ class CommServerSocketListener(ThreadedWorker[None]):
                     self._c = index
                 elif event == 8:
                     self._d = index
+                elif event == 10:
+                    pass  # No idea wh at this event is. Didn't seem to have an index to update.
                 else:
                     raise Exception(f"Unknown event {event} with index {index}")
         return result
