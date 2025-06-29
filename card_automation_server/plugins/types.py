@@ -91,3 +91,7 @@ class CardScan:
     device: int
     event_type: CardScanEvent
     location_id: int
+
+    def __post_init__(self):
+        if isinstance(self.event_type, int):
+            raise Exception("Crashing hard to find out where this is an integer.")
