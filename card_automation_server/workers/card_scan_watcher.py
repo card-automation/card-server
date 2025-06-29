@@ -4,7 +4,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from card_automation_server.config import Config
-from card_automation_server.plugins.types import CardScan, CommServerEventType, CardScanEvent
+from card_automation_server.plugins.types import CardScan, CommServerEventType
 from card_automation_server.windsx.db.models import EvnLog, NAMES, CARDS
 from card_automation_server.windsx.engines import LogEngine, AcsEngine
 from card_automation_server.workers.events import LogDatabaseUpdated, CardScanned, RawCommServerEvent

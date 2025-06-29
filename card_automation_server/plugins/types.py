@@ -5,14 +5,6 @@ from enum import Enum
 from typing import Optional, Literal
 
 
-# Need to keep this here until we can migrate plugins to stop using it
-class CardScanEventType(Enum):
-    ACCESS_GRANTED = 8
-    DENIED_UNKNOWN_CODE = 174
-    DENIED_TIMEZONE_INACTIVE = 175
-    DENIED_WRONG_ACCESS_LEVEL = 176
-
-
 class CommServerMessageType(enum.IntEnum):
     EVENT = 1
 
