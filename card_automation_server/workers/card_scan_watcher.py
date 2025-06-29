@@ -15,6 +15,13 @@ _Events = Union[
     RawCommServerEvent,
 ]
 
+_card_scan_events = [
+    CommServerEventType.ACCESS_GRANTED,
+    CommServerEventType.DENIED_UNKNOWN_CODE,
+    CommServerEventType.DENIED_TIMEZONE_INACTIVE,
+    CommServerEventType.DENIED_WRONG_ACCESS_LEVEL,
+]
+
 
 class CardScanWatcher(EventsWorker[_Events]):
     def __init__(self,
@@ -44,7 +51,7 @@ class CardScanWatcher(EventsWorker[_Events]):
 
         event: EvnLog
         for event in latest_events:
-            valid_event_codes = [x.value for x in CardScanEvent.__args__]
+            valid_event_codes = [x.value for x in _card_scan_events]
             if event.Event not in valid_event_codes:
                 continue
 
@@ -70,7 +77,7 @@ class CardScanWatcher(EventsWorker[_Events]):
         if timestamp < self._last_timestamp:
             return  # Probably already seen it via DB update, ignore it (though this one is always faster)
 
-        if not event.is_any_event(CardScanEvent):
+        if not event.is_any_event(*_card_scan_events):
             return
 
         location_id = event.data[2]
