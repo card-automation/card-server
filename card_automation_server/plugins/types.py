@@ -75,7 +75,3 @@ class CardScan:
     device: int
     event_type: CommServerEventType
     location_id: int
-
-    def __post_init__(self):
-        if isinstance(self.event_type, int) and not isinstance(self.event_type, CommServerEventType):
-            raise Exception("Crashing hard to find out where this is an integer.")
