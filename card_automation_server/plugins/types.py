@@ -66,14 +66,6 @@ class CommServerEventType(enum.IntEnum):
     ASCII_FILE_IMPORTED = 285
 
 
-CardScanEvent = Literal[
-    CommServerEventType.ACCESS_GRANTED,
-    CommServerEventType.DENIED_UNKNOWN_CODE,
-    CommServerEventType.DENIED_TIMEZONE_INACTIVE,
-    CommServerEventType.DENIED_WRONG_ACCESS_LEVEL
-]
-
-
 DoorOverrideEvent = Literal[
     CommServerEventType.OPR_SET_OUTPUT_SECURE,
     CommServerEventType.OPR_SET_OUTPUT_OPEN,
@@ -89,7 +81,7 @@ class CardScan:
     card_number: int
     scan_time: datetime
     device: int
-    event_type: CardScanEvent
+    event_type: CommServerEventType
     location_id: int
 
     def __post_init__(self):
