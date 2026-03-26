@@ -16,7 +16,7 @@ from card_automation_server.plugins.interfaces import Plugin
 from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.db.models import *
 from card_automation_server.windsx.engines import AcsEngine, LogEngine
-from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, ACTIVE_STOP_DATE
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
 from card_automation_server.windsx.lookup.person import PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
@@ -335,7 +335,7 @@ def table_cards(session: Session):
     active_card = {
         'Status': True,
         'StartDate': datetime(year=2000, month=1, day=1),
-        'StopDate': AccessCard.active_stop_date,
+        'StopDate': ACTIVE_STOP_DATE,
     }
     inactive_card = {
         'Status': False,

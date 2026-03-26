@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 from itertools import groupby
 from typing import Optional, Union, Iterable, Dict, Collection, List
 
@@ -77,30 +76,7 @@ class AclGroupComboLookup:
             ]
 
 
-class AclGroupComboSet(abc.ABC):
-    @property
-    @abc.abstractmethod
-    def id(self) -> Optional[int]: ...
-
-    @property
-    @abc.abstractmethod
-    def names(self) -> frozenset[str]: ...
-
-    @property
-    @abc.abstractmethod
-    def in_db(self) -> bool: ...
-
-    @abc.abstractmethod
-    def with_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet': ...
-
-    @abc.abstractmethod
-    def without_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet': ...
-
-    @abc.abstractmethod
-    def write(self): ...
-
-
-class _AclGroupComboSet(AclGroupComboSet):
+class _AclGroupComboSet:
     def __init__(self,
                  lookup_info: LookupInfo,
                  combo_id: Optional[int],
@@ -236,6 +212,13 @@ class _AclGroupComboSet(AclGroupComboSet):
             session.commit()
 
             self._lookup_info.updated_callback(self)
+
+
+class _Unused:
+    pass
+
+
+AclGroupComboSet = Union[_AclGroupComboSet, _Unused]
 
 
 def _empty_combo_set(lookup_info: LookupInfo) -> AclGroupComboSet:

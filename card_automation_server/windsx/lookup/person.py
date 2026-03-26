@@ -233,48 +233,7 @@ class PersonLookup(_PersonSearchBase):
             )
 
 
-class Person(abc.ABC):
-    @property
-    @abc.abstractmethod
-    def in_db(self) -> bool: ...
-
-    @property
-    @abc.abstractmethod
-    def id(self) -> Optional[int]: ...
-
-    @property
-    @abc.abstractmethod
-    def first_name(self) -> Optional[str]: ...
-
-    @first_name.setter
-    @abc.abstractmethod
-    def first_name(self, value: str) -> None: ...
-
-    @property
-    @abc.abstractmethod
-    def last_name(self) -> Optional[str]: ...
-
-    @last_name.setter
-    @abc.abstractmethod
-    def last_name(self, value: str) -> None: ...
-
-    @property
-    @abc.abstractmethod
-    def company_id(self) -> Optional[int]: ...
-
-    @company_id.setter
-    @abc.abstractmethod
-    def company_id(self, value: int) -> None: ...
-
-    @property
-    @abc.abstractmethod
-    def user_defined_fields(self) -> dict[str, str]: ...
-
-    @abc.abstractmethod
-    def write(self): ...
-
-
-class _Person(Person):
+class _Person:
     def __init__(self,
                  lookup_info: LookupInfo,
                  name_id: Optional[int] = None,
@@ -427,6 +386,13 @@ class _Person(Person):
 
             session.commit()
             self._lookup_info.updated_callback(self)
+
+
+class _Unused:
+    pass
+
+
+Person = Union[_Person, _Unused]
 
 
 def _new_person(lookup_info: LookupInfo) -> Person:
