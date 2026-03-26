@@ -139,13 +139,7 @@ class TestPersonLookup:
         self._assert_ray_securitay(person)
 
     def test_lookup_by_invalid_id(self, person_lookup: PersonLookup):
-        person = person_lookup.by_id(5555)
-
-        assert not person.in_db
-        assert person.id is None
-        assert person.first_name is None
-        assert person.last_name is None
-        assert person.company_id is None
+        assert person_lookup.by_id(5555) is None
 
     def test_lookup_on_invalid_udf_name(self, person_lookup: PersonLookup):
         with pytest.raises(InvalidUdfName) as ex:

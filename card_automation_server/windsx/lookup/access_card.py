@@ -31,7 +31,12 @@ class AccessCardLookup:
                  lookup_info: LookupInfo):
         self._lookup_info: LookupInfo = lookup_info
 
-    def by_card_number(self, card_number: Union[int, str]) -> 'AccessCard':
+    def new(self, card_number: Optional[Union[int, str]] = None) -> 'AccessCard':
+        if isinstance(card_number, str):
+            card_number = card_number.lstrip('0')
+        return _AccessCard(self._lookup_info, card_number=card_number)
+
+    def by_card_number(self, card_number: Union[int, str]) -> Optional['AccessCard']:
         # The DB engine might do this for us, but just to be on the safe side, we convert it to an integer with leading
         # 0's removed.
         if isinstance(card_number, str):
@@ -45,14 +50,13 @@ class AccessCardLookup:
             )
 
         if card is None:
-            access_card = _new_access_card(self._lookup_info)
-            access_card.card_number = card_number
-            return access_card
+            return None
 
-        acl_group_combo = AclGroupComboLookup(self._lookup_info).by_id(card.AclGrpComboID)
-        return _existing_access_card(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
+        combo_lookup = AclGroupComboLookup(self._lookup_info)
+        acl_group_combo = combo_lookup.by_id(card.AclGrpComboID) or combo_lookup.empty()
+        return _AccessCard(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
 
-    def by_id(self, card_id: int) -> 'AccessCard':
+    def by_id(self, card_id: int) -> Optional['AccessCard']:
         with self._lookup_info.new_session() as session:
             card: Optional[CARDS] = session.scalar(
                 select(CARDS)
@@ -61,10 +65,11 @@ class AccessCardLookup:
             )
 
         if card is None:
-            return _new_access_card(self._lookup_info)
+            return None
 
-        acl_group_combo = AclGroupComboLookup(self._lookup_info).by_id(card.AclGrpComboID)
-        return _existing_access_card(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
+        combo_lookup = AclGroupComboLookup(self._lookup_info)
+        acl_group_combo = combo_lookup.by_id(card.AclGrpComboID) or combo_lookup.empty()
+        return _AccessCard(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
 
 
 class AccessCard(abc.ABC):
@@ -88,7 +93,7 @@ class AccessCard(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def person(self) -> Person: ...
+    def person(self) -> Optional[Person]: ...
 
     @property
     @abc.abstractmethod
@@ -143,12 +148,9 @@ class _AccessCard(AccessCard):
         return self._active
 
     @property
-    def person(self) -> Person:
-        if self._person is None:
-            if self._name_id is None:
-                self._person = PersonLookup(self._lookup_info).new()
-            else:
-                self._person = PersonLookup(self._lookup_info).by_id(self._name_id)
+    def person(self) -> Optional[Person]:
+        if self._person is None and self._name_id is not None:
+            self._person = PersonLookup(self._lookup_info).by_id(self._name_id)
         return self._person
 
     @person.setter
@@ -181,7 +183,7 @@ class _AccessCard(AccessCard):
         return self
 
     def write(self):
-        if self._name_id is None:
+        if self.person is None:
             raise InvalidPersonForAccessCard("The person must be set for an access card")
 
         if not self.person.in_db:
@@ -522,14 +524,3 @@ class _AccessControlListUpdater:
         self._update_callback(update)
 
 
-def _new_access_card(lookup_info: LookupInfo) -> AccessCard:
-    return _AccessCard(lookup_info)
-
-
-def _existing_access_card(lookup_info: LookupInfo,
-                          card_id: int,
-                          card_number: int,
-                          name_id: Optional[int],
-                          active: bool,
-                          acl_group_combo: AclGroupComboSet) -> AccessCard:
-    return _AccessCard(lookup_info, card_id, card_number, name_id, active, acl_group_combo)

@@ -37,7 +37,6 @@ class TestDoorLookup:
         door: Door = door_lookup.by_id(1)
 
         assert door is not None
-        assert door.in_db
         assert door.id == 1
         assert door.name == 'Tenant 1 Door'
         assert door.location_id == main_location_id
@@ -63,7 +62,6 @@ class TestDoorLookup:
         door: Door = door_lookup.by_device_info(annex_location_id, 2)
 
         assert door is not None
-        assert door.in_db
         assert door.id == 7
         assert door.name == 'Tenant 3 Secret Lab Door'
         assert door.location_id == annex_location_id

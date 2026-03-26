@@ -110,27 +110,29 @@ class TestAccessCardLookup:
 
     def test_lookup_missing_card(self,
                                  access_card_lookup: AccessCardLookup):
-        access_card: AccessCard = access_card_lookup.by_card_number(10000)
-
-        assert not access_card.in_db
-        assert access_card.id is None
-        assert access_card.card_number == 10000
-        assert not access_card.active
-        assert access_card.access == frozenset()
-        assert access_card.person.id is None
-        assert not access_card.person.in_db
+        assert access_card_lookup.by_card_number(10000) is None
 
     def test_lookup_bad_location_group(self,
                                        access_card_lookup: AccessCardLookup):
-        access_card: AccessCard = access_card_lookup.by_card_number(3001)
-
         # This does exist in the DB, but only in an incorrect location group, so we treat it like it's not in the DB.
+        assert access_card_lookup.by_card_number(3001) is None
+
+    def test_new_card(self, access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.new()
+
         assert not access_card.in_db
         assert access_card.id is None
-        assert access_card.card_number == 3001
+        assert access_card.card_number is None
         assert not access_card.active
-        assert access_card.person.id is None
-        assert not access_card.person.in_db
+        assert access_card.access == frozenset()
+        assert access_card.person is None
+
+    def test_new_card_with_card_number(self, access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.new(9999)
+
+        assert not access_card.in_db
+        assert access_card.id is None
+        assert access_card.card_number == 9999
 
     def test_can_lookup_card_by_id(self,
                                    access_card_lookup: AccessCardLookup):
@@ -145,18 +147,12 @@ class TestAccessCardLookup:
 
     def test_lookup_by_id_that_does_not_exist(self,
                                                access_card_lookup: AccessCardLookup):
-        access_card: AccessCard = access_card_lookup.by_id(99999)
-
-        assert not access_card.in_db
-        assert access_card.id is None
+        assert access_card_lookup.by_id(99999) is None
 
     def test_lookup_by_id_in_wrong_location_group(self,
                                                    access_card_lookup: AccessCardLookup):
-        access_card: AccessCard = access_card_lookup.by_id(1001)
-
         # Card 1001 exists but belongs to bad_location_group, so we treat it as not found
-        assert not access_card.in_db
-        assert access_card.id is None
+        assert access_card_lookup.by_id(1001) is None
 
 
 class TestAccessCardWrite:
@@ -697,7 +693,7 @@ class TestAccessCardWrite:
                               acs_updated_callback: Mock,
                               access_card_lookup: AccessCardLookup,
                               person_lookup: PersonLookup):
-        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        access_card: AccessCard = access_card_lookup.new(9999)
         assert not access_card.in_db
 
         person: Person = person_lookup.by_name("JaneThe", "BuildingManager").find()[0]
@@ -712,7 +708,7 @@ class TestAccessCardWrite:
 
     def test_writing_new_card_with_no_person(self,
                                              access_card_lookup: AccessCardLookup):
-        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        access_card: AccessCard = access_card_lookup.new(9999)
         assert not access_card.in_db
 
         with pytest.raises(InvalidPersonForAccessCard):
@@ -720,7 +716,7 @@ class TestAccessCardWrite:
 
     def test_writing_missing_person(self,
                                     access_card_lookup: AccessCardLookup):
-        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        access_card: AccessCard = access_card_lookup.new(9999)
         assert not access_card.in_db
 
         access_card.person = 5555  # This ID doesn't exist
@@ -730,7 +726,7 @@ class TestAccessCardWrite:
 
     def test_writing_missing_person_with_different_location_group(self,
                                                                   access_card_lookup: AccessCardLookup):
-        access_card: AccessCard = access_card_lookup.by_card_number(9999)
+        access_card: AccessCard = access_card_lookup.new(9999)
         assert not access_card.in_db
 
         access_card.person = 1101  # BobThe BuildingManager with bad location group

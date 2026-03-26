@@ -43,7 +43,7 @@ class AclGroupComboLookup:
     def by_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet':
         return self.empty().with_names(*names)
 
-    def by_id(self, combo_id: int) -> 'AclGroupComboSet':
+    def by_id(self, combo_id: int) -> Optional['AclGroupComboSet']:
         with self._lookup_info.new_session() as session:
             rows = session.execute(
                 select(AclGrpName.Name)
@@ -53,7 +53,7 @@ class AclGroupComboLookup:
                 .where(AclGrpName.LocGrp == self._lookup_info.location_group_id)
             ).all()
             if not rows:
-                return _empty_combo_set(self._lookup_info)
+                return None
             names = frozenset(row.Name for row in rows)
             return _existing_combo_set(self._lookup_info, combo_id, names)
 

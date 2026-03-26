@@ -33,10 +33,7 @@ class TestAclGroupComboLookup:
         assert acl_group_combo.in_db
 
     def test_lookup_by_id_that_does_not_exist(self, acl_group_combo_lookup: AclGroupComboLookup):
-        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(99)
-        assert acl_group_combo.id is None
-        assert len(acl_group_combo.names) == 0
-        assert not acl_group_combo.in_db
+        assert acl_group_combo_lookup.by_id(99) is None
 
     def test_lookup_by_name(self, acl_group_combo_lookup: AclGroupComboLookup):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1)
@@ -131,21 +128,11 @@ class TestAclGroupComboLookup:
 
     def test_by_id_that_is_in_another_location_group(self,
                                                      acl_group_combo_lookup: AclGroupComboLookup):
-        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(200)
-
-        assert acl_group_combo.id is None
-        assert len(acl_group_combo.names) == 0
-        assert not acl_group_combo.in_db
+        assert acl_group_combo_lookup.by_id(200) is None
 
     def test_by_id_where_name_is_in_another_location_group(self,
                                                            acl_group_combo_lookup: AclGroupComboLookup):
-        acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(201)
-
-        # We should find the combo, and it should be in the database, but no names should be attached. Since only one
-        # (invalid) name row is returned, as far as anyone is concerned this combo id isn't in the database.
-        assert acl_group_combo.id is None
-        assert len(acl_group_combo.names) == 0
-        assert not acl_group_combo.in_db
+        assert acl_group_combo_lookup.by_id(201) is None
 
     def test_by_name_that_is_an_invalid_group_name(self, acl_group_combo_lookup: AclGroupComboLookup):
         with pytest.raises(AclGroupNameNotInDatabase) as ex:
