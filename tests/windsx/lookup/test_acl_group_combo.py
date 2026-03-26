@@ -22,7 +22,7 @@ _bad_location_group_name = "Bad Location Group Name"
 class TestAclGroupComboLookup:
     def test_empty(self, acl_group_combo_lookup: AclGroupComboLookup):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.empty()
-        assert acl_group_combo.id == 0
+        assert acl_group_combo.id is None
         assert acl_group_combo.names == frozenset()
         assert not acl_group_combo.in_db
 
@@ -34,7 +34,7 @@ class TestAclGroupComboLookup:
 
     def test_lookup_by_id_that_does_not_exist(self, acl_group_combo_lookup: AclGroupComboLookup):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(99)
-        assert acl_group_combo.id == 99
+        assert acl_group_combo.id is None
         assert len(acl_group_combo.names) == 0
         assert not acl_group_combo.in_db
 
@@ -60,7 +60,7 @@ class TestAclGroupComboLookup:
 
     def test_lookup_by_name_with_group_that_does_not_exist(self, acl_group_combo_lookup: AclGroupComboLookup):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1, _tenant_2)
-        assert acl_group_combo.id == 0
+        assert acl_group_combo.id is None
         assert acl_group_combo.names == frozenset({_tenant_1, _tenant_2})
         assert not acl_group_combo.in_db
 
@@ -88,7 +88,7 @@ class TestAclGroupComboLookup:
 
         new_acl_group_combo: AclGroupComboSet = acl_group_combo.without_names(_main_building_access)
 
-        assert new_acl_group_combo.id == 0
+        assert new_acl_group_combo.id is None
         assert new_acl_group_combo.names == frozenset()
         assert not new_acl_group_combo.in_db
 
@@ -133,7 +133,7 @@ class TestAclGroupComboLookup:
                                                      acl_group_combo_lookup: AclGroupComboLookup):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_id(200)
 
-        assert acl_group_combo.id == 200
+        assert acl_group_combo.id is None
         assert len(acl_group_combo.names) == 0
         assert not acl_group_combo.in_db
 
@@ -143,7 +143,7 @@ class TestAclGroupComboLookup:
 
         # We should find the combo, and it should be in the database, but no names should be attached. Since only one
         # (invalid) name row is returned, as far as anyone is concerned this combo id isn't in the database.
-        assert acl_group_combo.id == 201
+        assert acl_group_combo.id is None
         assert len(acl_group_combo.names) == 0
         assert not acl_group_combo.in_db
 
@@ -165,7 +165,7 @@ class TestAclGroupComboLookup:
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1, _tenant_2, _tenant_3)
 
         # Combo ID 202 does exist, but shouldn't be selected because it's a different location group.
-        assert acl_group_combo.id == 0
+        assert acl_group_combo.id is None
         assert acl_group_combo.names == frozenset({_tenant_1, _tenant_2, _tenant_3})
         assert not acl_group_combo.in_db
 

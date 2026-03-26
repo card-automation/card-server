@@ -1,11 +1,14 @@
+from __future__ import annotations
+
+import abc
 from itertools import groupby
 from typing import Optional, Union, Iterable, Dict, Collection, List
 
-from sqlalchemy import select, distinct
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import AclGrpCombo, AclGrpName
-from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
+from card_automation_server.windsx.lookup.utils import LookupInfo
 
 StringOrFrozenSet = Union[str, frozenset[str], Iterable[str]]
 
@@ -35,40 +38,81 @@ class AclGroupComboLookup:
         self._lookup_info: LookupInfo = lookup_info
 
     def empty(self) -> 'AclGroupComboSet':
-        return AclGroupComboSet(self._lookup_info, 0)
+        return _empty_combo_set(self._lookup_info)
 
     def by_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet':
         return self.empty().with_names(*names)
 
-    def by_id(self, combo_id: int):
-        return AclGroupComboSet(self._lookup_info, combo_id)
+    def by_id(self, combo_id: int) -> 'AclGroupComboSet':
+        with self._lookup_info.new_session() as session:
+            rows = session.execute(
+                select(AclGrpName.Name)
+                .join(AclGrpCombo, AclGrpCombo.AclGrpNameID == AclGrpName.ID)
+                .where(AclGrpCombo.ComboID == combo_id)
+                .where(AclGrpCombo.LocGrp == self._lookup_info.location_group_id)
+                .where(AclGrpName.LocGrp == self._lookup_info.location_group_id)
+            ).all()
+            if not rows:
+                return _empty_combo_set(self._lookup_info)
+            names = frozenset(row.Name for row in rows)
+            return _existing_combo_set(self._lookup_info, combo_id, names)
 
     def all(self) -> List['AclGroupComboSet']:
-        session = Session(self._lookup_info.acs_engine)
-        combo_id_rows = session.execute(
-            select(distinct(AclGrpCombo.ComboID))
-            .join(AclGrpName, AclGrpName.ID == AclGrpCombo.AclGrpNameID)
-            .where(AclGrpCombo.LocGrp == self._lookup_info.location_group_id)
-            .where(AclGrpName.LocGrp == self._lookup_info.location_group_id)
-        ).all()
+        with self._lookup_info.new_session() as session:
+            rows = session.execute(
+                select(AclGrpCombo.ComboID, AclGrpName.Name)
+                .join(AclGrpName, AclGrpName.ID == AclGrpCombo.AclGrpNameID)
+                .where(AclGrpCombo.LocGrp == self._lookup_info.location_group_id)
+                .where(AclGrpName.LocGrp == self._lookup_info.location_group_id)
+            ).all()
 
-        return [self.by_id(row[0]) for row in combo_id_rows]
+            combos: Dict[int, frozenset[str]] = {}
+            for row in rows:
+                combo_id, name = row.ComboID, row.Name
+                combos[combo_id] = combos.get(combo_id, frozenset()) | {name}
+
+            return [
+                _existing_combo_set(self._lookup_info, combo_id, names)
+                for combo_id, names in combos.items()
+            ]
 
 
-class AclGroupComboSet(DbModel):
+class AclGroupComboSet(abc.ABC):
+    @property
+    @abc.abstractmethod
+    def id(self) -> Optional[int]: ...
+
+    @property
+    @abc.abstractmethod
+    def names(self) -> frozenset[str]: ...
+
+    @property
+    @abc.abstractmethod
+    def in_db(self) -> bool: ...
+
+    @abc.abstractmethod
+    def with_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet': ...
+
+    @abc.abstractmethod
+    def without_names(self, *names: StringOrFrozenSet) -> 'AclGroupComboSet': ...
+
+    @abc.abstractmethod
+    def write(self): ...
+
+
+class _AclGroupComboSet(AclGroupComboSet):
     def __init__(self,
                  lookup_info: LookupInfo,
-                 combo_id: int
+                 combo_id: Optional[int],
+                 names: frozenset[str]
                  ):
         self._lookup_info: LookupInfo = lookup_info
         self._location_group_id: int = self._lookup_info.location_group_id
-        self._session = Session(self._lookup_info.acs_engine)
-        self._combo_id = combo_id
-        self._names: Optional[frozenset[str]] = None
-        super().__init__()
+        self._combo_id: Optional[int] = combo_id
+        self._names: frozenset[str] = names
 
     @property
-    def id(self) -> int:
+    def id(self) -> Optional[int]:
         return self._combo_id
 
     @property
@@ -77,34 +121,11 @@ class AclGroupComboSet(DbModel):
 
     @property
     def in_db(self) -> bool:
-        return self._in_db
+        return self._combo_id is not None
 
     def __str__(self):
         names = ", ".join(self.names)
         return f"{self.id}: {names}"
-
-    def _populate_from_db(self):
-        name_id_rows = self._session.execute(
-            select(AclGrpCombo.AclGrpNameID)
-            .join(AclGrpName, AclGrpName.ID == AclGrpCombo.AclGrpNameID)
-            .where(AclGrpCombo.ComboID == self._combo_id)
-            .where(AclGrpCombo.LocGrp == self._location_group_id)
-            .where(AclGrpName.LocGrp == self._location_group_id)
-        ).all()
-
-        if len(name_id_rows) == 0:
-            self._names = frozenset()
-            self._in_db = False
-            return
-
-        # We know it's in there now
-        self._in_db = True
-
-        # Let's grab our names
-        name_ids = set(row.AclGrpNameID for row in name_id_rows)
-        id_to_names = self._names_by_id(name_ids)
-
-        self._names = frozenset(id_to_names.values())
 
     @staticmethod
     def _to_set(*values: StringOrFrozenSet) -> frozenset[str]:
@@ -120,28 +141,12 @@ class AclGroupComboSet(DbModel):
 
         return result
 
-    def _names_by_id(self, name_ids: Collection[int]) -> Dict[int, str]:
-        acl_group_name_rows = self._session.execute(
-            select(AclGrpName.ID, AclGrpName.Name)
-            .where(AclGrpName.ID.in_(name_ids))
-        ).all()
-
-        id_to_names = {}
-
-        for row in acl_group_name_rows:
-            id_to_names[row[0]] = row[1]
-
-        if len(id_to_names) != len(name_ids):
-            raise Exception("Could not fetch all names by ID, suggesting DB has invalid data")
-
-        return id_to_names
-
-    def _name_ids_by_name(self, names: Collection[str]) -> Dict[str, int]:
+    def _name_ids_by_name(self, session: Session, names: Collection[str]) -> Dict[str, int]:
         if len(names) == 0:
             # Our tests would handle the below SQL statement just fine, but Microsoft Access is less happy with it.
             return {}
 
-        acl_group_name_rows = self._session.execute(
+        acl_group_name_rows = session.execute(
             select(AclGrpName.ID, AclGrpName.Name)
             .where(AclGrpName.Name.in_(names))
             .where(AclGrpName.LocGrp == self._location_group_id)
@@ -176,26 +181,23 @@ class AclGroupComboSet(DbModel):
 
         return self._get_acl_by_names(new_names)
 
-    def _get_acl_by_names(self, all_names):
-        wanted_name_ids = set(self._name_ids_by_name(all_names).values())
+    def _get_acl_by_names(self, all_names: frozenset[str]) -> 'AclGroupComboSet':
+        with self._lookup_info.new_session() as session:
+            wanted_name_ids = set(self._name_ids_by_name(session, all_names).values())
 
-        acl_combos = self._session.execute(
-            select(AclGrpCombo.AclGrpNameID, AclGrpCombo.ComboID)
-            .where(AclGrpCombo.LocGrp == self._location_group_id)
-        ).all()
-        grouped_by_combo_id = groupby(acl_combos, lambda x: x[1])  # Group by the Combo ID
+            acl_combos = session.execute(
+                select(AclGrpCombo.AclGrpNameID, AclGrpCombo.ComboID)
+                .where(AclGrpCombo.LocGrp == self._location_group_id)
+            ).all()
+            grouped_by_combo_id = groupby(acl_combos, lambda x: x[1])  # Group by the Combo ID
 
-        for new_combo_id, value in grouped_by_combo_id:
-            acl_name_ids = set([x.AclGrpNameID for x in value])
-            if acl_name_ids == wanted_name_ids:  # Oh good, we found an exact match
-                return AclGroupComboSet(self._lookup_info, new_combo_id)
+            for new_combo_id, value in grouped_by_combo_id:
+                acl_name_ids = set([x.AclGrpNameID for x in value])
+                if acl_name_ids == wanted_name_ids:  # Oh good, we found an exact match
+                    return _existing_combo_set(self._lookup_info, new_combo_id, all_names)
 
-        # This doesn't exist, so we create one, update the names manually, and mark it as not in the database
-        result = AclGroupComboSet(self._lookup_info, 0)
-        result._names = all_names
-        result._in_db = False
-
-        return result
+        # This doesn't exist, so we create one with the names but mark it as not in the database
+        return _AclGroupComboSet(self._lookup_info, None, all_names)
 
     def write(self):
         if self.in_db:
@@ -204,33 +206,41 @@ class AclGroupComboSet(DbModel):
         if len(self._names) == 0:
             return
 
-        names_to_ids = self._name_ids_by_name(self._names)
-        name_id_iterator = iter(names_to_ids.values())
+        with self._lookup_info.new_session() as session:
+            names_to_ids = self._name_ids_by_name(session, self._names)
+            name_id_iterator = iter(names_to_ids.values())
 
-        # We need to insert one of them to get a new combo id. The ID field gets a generated ID, which we treat as the
-        # combo id for this AclGrpComboId
-        starting_combo = AclGrpCombo(
-            AclGrpNameID=next(name_id_iterator),  # next meaning "just grab the first one". We handle any others below
-            ComboID=0,  # Explicitly setting this to 0, will update it after this record is inserted
-            LocGrp=self._location_group_id
-        )
-        self._session.add(starting_combo)
-        self._session.commit()
+            # We need to insert one of them to get a new combo id. The ID field gets a generated ID, which we treat as the
+            # combo id for this AclGrpComboId
+            starting_combo = AclGrpCombo(
+                AclGrpNameID=next(name_id_iterator),  # next meaning "just grab the first one". We handle any others below
+                ComboID=0,  # Explicitly setting this to 0, will update it after this record is inserted
+                LocGrp=self._location_group_id
+            )
+            session.add(starting_combo)
+            session.commit()
 
-        # Now we should have an ID we can assign to this set and to the starting object, which will get updated next commit
-        self._combo_id = starting_combo.ComboID = starting_combo.ID
+            # Now we should have an ID we can assign to this set and to the starting object, which will get updated next commit
+            self._combo_id = starting_combo.ComboID = starting_combo.ID
 
-        self._session.add_all(
-            [
-                AclGrpCombo(
-                    AclGrpNameID=name_id,
-                    ComboID=self._combo_id,
-                    LocGrp=self._location_group_id
-                ) for name_id in name_id_iterator
-            ]
-        )
+            session.add_all(
+                [
+                    AclGrpCombo(
+                        AclGrpNameID=name_id,
+                        ComboID=self._combo_id,
+                        LocGrp=self._location_group_id
+                    ) for name_id in name_id_iterator
+                ]
+            )
 
-        self._session.commit()
+            session.commit()
 
-        self._in_db = True  # Now we're in the database :)
-        self._lookup_info.updated_callback(self)
+            self._lookup_info.updated_callback(self)
+
+
+def _empty_combo_set(lookup_info: LookupInfo) -> AclGroupComboSet:
+    return _AclGroupComboSet(lookup_info, None, frozenset())
+
+
+def _existing_combo_set(lookup_info: LookupInfo, combo_id: int, names: frozenset[str]) -> AclGroupComboSet:
+    return _AclGroupComboSet(lookup_info, combo_id, names)
