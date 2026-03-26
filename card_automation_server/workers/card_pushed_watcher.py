@@ -96,14 +96,11 @@ class CardPushedWatcher(EventsWorker[_Events]):
             if len(locations) > 0:
                 continue  # Not all locations have been updated yet
 
-            self.outbound_queue.put(
-                AccessCardPushed(
-                    AccessCardLookup(self._lookup_info).by_id(card_id)
-                )
-            )
-
-            # Now that all locations have been updated, it's safe to remove this so we don't double notify
+            card = AccessCardLookup(self._lookup_info).by_id(card_id)
             del self._card_ids_to_location_updates[card_id]
+
+            if card is not None:
+                self.outbound_queue.put(AccessCardPushed(card))
 
     def _bring_in_new_cards(self):
         pending_loc_cards = self._acs_session.scalars(

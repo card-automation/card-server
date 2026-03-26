@@ -72,10 +72,6 @@ class Door:
         self._location_id: int = location_id
 
     @property
-    def in_db(self) -> bool:
-        return True
-
-    @property
     def id(self) -> int:
         return self._id
 

@@ -210,7 +210,7 @@ class PersonLookup(_PersonSearchBase):
     def new(self) -> Person:
         return _new_person(self._lookup_info)
 
-    def by_id(self, name_id: int) -> Person:
+    def by_id(self, name_id: int) -> Optional[Person]:
         with self._lookup_info.new_session() as session:
             name: Optional[NAMES] = session.scalar(
                 select(NAMES)
@@ -219,7 +219,7 @@ class PersonLookup(_PersonSearchBase):
             )
 
             if name is None:
-                return _new_person(self._lookup_info)
+                return None
 
             udf_data = _load_udfs(session, self._location_group_id, [name_id])
 
