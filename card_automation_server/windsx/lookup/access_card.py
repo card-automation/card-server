@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import CARDS, LOC, AclGrpName, AclGrpCombo, AclGrp, DGRP, ACL, LocCards
-from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet
+from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupComboLookup
 from card_automation_server.windsx.lookup.person import Person, PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
 
@@ -57,7 +57,7 @@ class AccessCard(DbModel):
         self._name_id: Optional[int] = None
         self._person: Optional[Person] = None
         self._active: Optional[bool] = None
-        self._acl_group_combo: AclGroupComboSet = AclGroupComboSet(self._lookup_info, 0)
+        self._acl_group_combo: AclGroupComboSet = AclGroupComboLookup(self._lookup_info).empty()
         super().__init__()
 
     @property
@@ -143,7 +143,7 @@ class AccessCard(DbModel):
         self._card_number = int(card.Code)
         self._name_id = card.NameID
         self._active = card.Status
-        self._acl_group_combo = AclGroupComboSet(self._lookup_info, card.AclGrpComboID)
+        self._acl_group_combo = AclGroupComboLookup(self._lookup_info).by_id(card.AclGrpComboID)
         self._in_db = True
 
     def write(self):
