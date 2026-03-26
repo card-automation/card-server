@@ -405,6 +405,10 @@ def table_location_cards(session: Session):
         # 902 is used in test_updated_to_bad_location_are_ignored
     ])
 
+def pytest_configure(config: pytest.Config):
+    config.addinivalue_line(
+        "markers", "long: marks tests as a test that takes a while to run"
+    )
 
 @pytest.fixture
 def db_is_file(tmp_path: Path) -> Path:
@@ -520,6 +524,7 @@ def acs_updated_callback() -> Mock:
 
 @pytest.fixture
 def lookup_info(acs_data_engine: Engine, acs_updated_callback: Mock) -> LookupInfo:
+    # noinspection PyTypeChecker
     return LookupInfo(
         acs_engine=acs_data_engine,
         location_group_id=location_group_id,
