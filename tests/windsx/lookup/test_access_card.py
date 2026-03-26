@@ -132,6 +132,32 @@ class TestAccessCardLookup:
         assert access_card.person.id is None
         assert not access_card.person.in_db
 
+    def test_can_lookup_card_by_id(self,
+                                   access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.by_id(1)
+
+        assert access_card.in_db
+        assert access_card.id == 1
+        assert access_card.card_number == 3000
+        assert access_card.active
+        assert access_card.access == frozenset({_acl_name_master_access_level})
+        assert access_card.person.id == 101
+
+    def test_lookup_by_id_that_does_not_exist(self,
+                                               access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.by_id(99999)
+
+        assert not access_card.in_db
+        assert access_card.id is None
+
+    def test_lookup_by_id_in_wrong_location_group(self,
+                                                   access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.by_id(1001)
+
+        # Card 1001 exists but belongs to bad_location_group, so we treat it as not found
+        assert not access_card.in_db
+        assert access_card.id is None
+
 
 class TestAccessCardWrite:
     today = datetime.combine(date.today(), datetime.min.time())
