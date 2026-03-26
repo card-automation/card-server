@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, InstrumentedAttribute, Mapped
 
 from card_automation_server.windsx.db.models import CARDS, DGRP, ACL, LocCards, LOC
-from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, InvalidPersonForAccessCard
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, InvalidPersonForAccessCard, \
+    LocCardUpdate
 from card_automation_server.windsx.lookup.person import Person, PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from tests.conftest import main_location_id, annex_location_id
@@ -112,7 +113,7 @@ class TestAccessCardLookup:
         access_card: AccessCard = access_card_lookup.by_card_number(10000)
 
         assert not access_card.in_db
-        assert access_card.id == 0
+        assert access_card.id is None
         assert access_card.card_number == 10000
         assert not access_card.active
         assert access_card.access == frozenset()
@@ -125,19 +126,8 @@ class TestAccessCardLookup:
 
         # This does exist in the DB, but only in an incorrect location group, so we treat it like it's not in the DB.
         assert not access_card.in_db
-        assert access_card.id == 0
+        assert access_card.id is None
         assert access_card.card_number == 3001
-        assert not access_card.active
-        assert access_card.person.id is None
-        assert not access_card.person.in_db
-
-    def test_direct_access_bad_location_group(self, lookup_info: LookupInfo):
-        access_card: AccessCard = AccessCard(lookup_info, 1002)  # Card # 3001, bad location group
-
-        # This does exist in the DB, but only in an incorrect location group, so we treat it like it's not in the DB.
-        assert not access_card.in_db
-        assert access_card.id == 1002
-        assert access_card.card_number is None  # We never set it, so it should remain None
         assert not access_card.active
         assert access_card.person.id is None
         assert not access_card.person.in_db
@@ -498,17 +488,17 @@ class TestAccessCardWrite:
         acs_updated_callback.assert_called_with(access_card)
         loc_cards = [x.args[0]
                            for x in acs_updated_callback.call_args_list
-                           if len(x.args) == 1 and isinstance(x.args[0], LocCards)]
+                           if len(x.args) == 1 and isinstance(x.args[0], LocCardUpdate)]
         assert len(loc_cards) == 2
 
         # We only care about the new, non-main one
-        expected_loc_cards = [x for x in loc_cards if x.ID != main_loc_cards.ID]
+        expected_loc_cards = [x for x in loc_cards if x.id != main_loc_cards.ID]
         assert len(expected_loc_cards) == 1
 
-        loc_cards_arg: LocCards = expected_loc_cards[0]
-        assert loc_cards_arg.ID == new_loc_cards.ID
-        assert loc_cards_arg.CardID == new_loc_cards.CardID
-        assert loc_cards_arg.Loc == new_loc_cards.Loc
+        loc_cards_arg: LocCardUpdate = expected_loc_cards[0]
+        assert loc_cards_arg.id == new_loc_cards.ID
+        assert loc_cards_arg.card_id == new_loc_cards.CardID
+        assert loc_cards_arg.loc == new_loc_cards.Loc
 
     def test_removing_card_access_sets_loc_cards_row_for_deletion(self,
                                                                   acs_data_session: Session,
@@ -545,12 +535,12 @@ class TestAccessCardWrite:
         acs_updated_callback.assert_called_with(access_card)
         loc_cards_calls = [x
                            for x in acs_updated_callback.call_args_list
-                           if len(x.args) == 1 and isinstance(x.args[0], LocCards)]
+                           if len(x.args) == 1 and isinstance(x.args[0], LocCardUpdate)]
         assert len(loc_cards_calls) == 1
-        loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
-        assert loc_cards_arg.ID == loc_cards.ID
-        assert loc_cards_arg.CardID == loc_cards.CardID
-        assert loc_cards_arg.Loc == loc_cards.Loc
+        loc_cards_arg: LocCardUpdate = loc_cards_calls[0].args[0]
+        assert loc_cards_arg.id == loc_cards.ID
+        assert loc_cards_arg.card_id == loc_cards.CardID
+        assert loc_cards_arg.loc == loc_cards.Loc
 
     def test_giving_master_access_level_sets_acl_to_zero(self,
                                                          acs_data_session: Session,
@@ -605,14 +595,14 @@ class TestAccessCardWrite:
             loc_cards_calls = [
                 x for x in acs_updated_callback.call_args_list
                 if len(x.args) == 1 \
-                   and isinstance(x.args[0], LocCards) \
-                   and x.args[0].ID == loc_cards.ID
+                   and isinstance(x.args[0], LocCardUpdate) \
+                   and x.args[0].id == loc_cards.ID
             ]
             assert len(loc_cards_calls) == 1
-            loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
-            assert loc_cards_arg.ID == loc_cards.ID
-            assert loc_cards_arg.CardID == loc_cards.CardID
-            assert loc_cards_arg.Loc == loc_cards.Loc
+            loc_cards_arg: LocCardUpdate = loc_cards_calls[0].args[0]
+            assert loc_cards_arg.id == loc_cards.ID
+            assert loc_cards_arg.card_id == loc_cards.CardID
+            assert loc_cards_arg.loc == loc_cards.Loc
 
     def test_rewriting_with_existing_access_level_sets_locs_cards(self,
                                                                   acs_updated_callback: Mock,
@@ -635,11 +625,11 @@ class TestAccessCardWrite:
         assert card.Status
         loc_cards_calls = [x
                            for x in acs_updated_callback.call_args_list
-                           if len(x.args) == 1 and isinstance(x.args[0], LocCards)]
+                           if len(x.args) == 1 and isinstance(x.args[0], LocCardUpdate)]
         assert len(loc_cards_calls) == 1
-        loc_cards_arg: LocCards = loc_cards_calls[0].args[0]
-        assert loc_cards_arg.CardID == card.ID
-        assert loc_cards_arg.DlFlag == 1
+        loc_cards_arg: LocCardUpdate = loc_cards_calls[0].args[0]
+        assert loc_cards_arg.card_id == card.ID
+        assert loc_cards_arg.dl_flag == 1
 
     def test_writing_card_updates_location_table_to_download(self,
                                                              db_helper: DbHelper,
