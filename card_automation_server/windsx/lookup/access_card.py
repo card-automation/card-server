@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import CARDS, LOC, AclGrpName, AclGrpCombo, AclGrp, DGRP, ACL, LocCards
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet
-from card_automation_server.windsx.lookup.person import Person
+from card_automation_server.windsx.lookup.person import Person, PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
 
 
@@ -55,6 +55,7 @@ class AccessCard(DbModel):
         self._card_id: int = card_id
         self._card_number: Optional[int] = None
         self._name_id: Optional[int] = None
+        self._person: Optional[Person] = None
         self._active: Optional[bool] = None
         self._acl_group_combo: AclGroupComboSet = AclGroupComboSet(self._lookup_info, 0)
         super().__init__()
@@ -77,14 +78,21 @@ class AccessCard(DbModel):
 
     @property
     def person(self) -> Person:
-        return Person(self._lookup_info, self._name_id)
+        if self._person is None:
+            if self._name_id is None:
+                self._person = PersonLookup(self._lookup_info).new()
+            else:
+                self._person = PersonLookup(self._lookup_info).by_id(self._name_id)
+        return self._person
 
     @person.setter
     def person(self, value: Union[Person, int]):
         if isinstance(value, Person):
-            value = value.id
-
-        self._name_id = value
+            self._person = value
+            self._name_id = value.id
+        else:
+            self._person = None
+            self._name_id = value
 
     @property
     def access(self) -> frozenset[str]:
@@ -117,7 +125,7 @@ class AccessCard(DbModel):
         if self._card_id == 0:
             # Card number isn't set here as the only reason to look up a card id of 0 is to make a new card. We want to
             # let the consumer of this API set the card number, so we don't set it here.
-            self._name_id = 0
+            self._name_id = None
             self._active = False
             self._in_db = False
             return
@@ -127,7 +135,7 @@ class AccessCard(DbModel):
         if card is None:
             # We shouldn't see this unless someone directly made an access card using a card id directly. Possible, but
             # not the advised route. Still, it doesn't hurt to explicitly protect from this mistake.
-            self._name_id = 0
+            self._name_id = None
             self._active = False
             self._in_db = False
             return
@@ -139,7 +147,7 @@ class AccessCard(DbModel):
         self._in_db = True
 
     def write(self):
-        if self._name_id == 0:
+        if self._name_id is None:
             raise InvalidPersonForAccessCard("The person must be set for an access card")
 
         if not self.person.in_db:

@@ -83,7 +83,6 @@ class TestAccessCardLookup:
         assert access_card.card_number == 3000
         assert access_card.active
         assert access_card.access == frozenset({_acl_name_master_access_level})
-        assert isinstance(access_card.person, Person)
         assert access_card.person.id == 101
 
     def test_can_lookup_card_by_card_number_string(self,
@@ -95,7 +94,6 @@ class TestAccessCardLookup:
         assert access_card.card_number == 3000
         assert access_card.active
         assert access_card.access == frozenset({_acl_name_master_access_level})
-        assert isinstance(access_card.person, Person)
         assert access_card.person.id == 101
 
     def test_lookup_strips_leading_zeros(self,
@@ -107,7 +105,6 @@ class TestAccessCardLookup:
         assert access_card.card_number == 200
         assert access_card.active
         assert access_card.access == frozenset({_acl_name_master_access_level})
-        assert isinstance(access_card.person, Person)
         assert access_card.person.id == 110
 
     def test_lookup_missing_card(self,
@@ -119,8 +116,7 @@ class TestAccessCardLookup:
         assert access_card.card_number == 10000
         assert not access_card.active
         assert access_card.access == frozenset()
-        assert isinstance(access_card.person, Person)
-        assert access_card.person.id == 0
+        assert access_card.person.id is None
         assert not access_card.person.in_db
 
     def test_lookup_bad_location_group(self,
@@ -132,8 +128,7 @@ class TestAccessCardLookup:
         assert access_card.id == 0
         assert access_card.card_number == 3001
         assert not access_card.active
-        assert isinstance(access_card.person, Person)
-        assert access_card.person.id == 0
+        assert access_card.person.id is None
         assert not access_card.person.in_db
 
     def test_direct_access_bad_location_group(self, lookup_info: LookupInfo):
@@ -144,8 +139,7 @@ class TestAccessCardLookup:
         assert access_card.id == 1002
         assert access_card.card_number is None  # We never set it, so it should remain None
         assert not access_card.active
-        assert isinstance(access_card.person, Person)
-        assert access_card.person.id == 0
+        assert access_card.person.id is None
         assert not access_card.person.in_db
 
 

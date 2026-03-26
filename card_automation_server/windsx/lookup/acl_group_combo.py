@@ -64,7 +64,7 @@ class AclGroupComboSet(DbModel):
         self._location_group_id: int = self._lookup_info.location_group_id
         self._session = Session(self._lookup_info.acs_engine)
         self._combo_id = combo_id
-        self._names: Optional[frozenset[[str]]] = None
+        self._names: Optional[frozenset[str]] = None
         super().__init__()
 
     @property

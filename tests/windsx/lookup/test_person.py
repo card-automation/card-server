@@ -138,11 +138,11 @@ class TestPersonLookup:
         person = people[0]
         self._assert_ray_securitay(person)
 
-    def test_lookup_by_invalid_id(self, lookup_info: LookupInfo):
-        person = Person(lookup_info, 5555)
+    def test_lookup_by_invalid_id(self, person_lookup: PersonLookup):
+        person = person_lookup.by_id(5555)
 
         assert not person.in_db
-        assert person.id == 5555
+        assert person.id is None
         assert person.first_name is None
         assert person.last_name is None
         assert person.company_id is None
