@@ -1,23 +1,9 @@
-import abc
-from typing import Optional, Callable, Any
+from typing import Callable, Any
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.engines import AcsEngine
-
-
-class DbModel(abc.ABC):
-    def __init__(self):
-        self._in_db: Optional[bool] = None
-        self._populate_from_db()
-
-    def _populate_from_db(self):
-        pass
-
-    @property
-    def in_db(self) -> bool:
-        return self._in_db
 
 
 class LookupInfo:
