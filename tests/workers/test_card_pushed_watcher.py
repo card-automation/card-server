@@ -5,7 +5,7 @@ from sqlalchemy import select, Engine
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import LocCards
-from card_automation_server.windsx.lookup.access_card import AccessCard
+from card_automation_server.windsx.lookup.access_card import AccessCard, AccessCardLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.card_pushed_watcher import CardPushedWatcher
 from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, \
@@ -62,7 +62,7 @@ class TestCardPushedWatcher:
                                                                 acs_data_session: Session,
                                                                 card_pushed_watcher: CardPushedWatcher,
                                                                 outbound_event_queue_empty: EmptyCallable):
-        access_card = AccessCard(lookup_info, 5)
+        access_card = AccessCardLookup(lookup_info).by_card_number(2002)
         card_pushed_watcher.event(AccessCardUpdated(access_card))
 
         assert outbound_event_queue_empty()
@@ -110,7 +110,7 @@ class TestCardPushedWatcher:
                                acs_data_session: Session,
                                card_pushed_watcher: CardPushedWatcher,
                                outbound_event_queue_empty: EmptyCallable):
-        access_card = AccessCard(lookup_info, 5)
+        access_card = AccessCardLookup(lookup_info).by_card_number(2002)
         card_pushed_watcher.event(AccessCardUpdated(access_card))
 
         assert outbound_event_queue_empty()

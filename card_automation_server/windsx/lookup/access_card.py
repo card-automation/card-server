@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import abc
+from dataclasses import dataclass
 from datetime import datetime, date
 from typing import Optional, Union, Callable, Any
 
@@ -7,7 +11,15 @@ from sqlalchemy.orm import Session
 from card_automation_server.windsx.db.models import CARDS, LOC, AclGrpName, AclGrpCombo, AclGrp, DGRP, ACL, LocCards
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupComboLookup
 from card_automation_server.windsx.lookup.person import Person, PersonLookup
-from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
+from card_automation_server.windsx.lookup.utils import LookupInfo
+
+
+@dataclass(frozen=True)
+class LocCardUpdate:
+    id: int
+    card_id: int
+    loc: int
+    dl_flag: int
 
 
 class InvalidPersonForAccessCard(Exception):
@@ -19,53 +31,107 @@ class AccessCardLookup:
                  lookup_info: LookupInfo):
         self._lookup_info: LookupInfo = lookup_info
 
-    def by_card_number(self, card_number: Union[int, str]):
-        session = Session(self._lookup_info.acs_engine)
-
+    def by_card_number(self, card_number: Union[int, str]) -> 'AccessCard':
         # The DB engine might do this for us, but just to be on the safe side, we convert it to an integer with leading
         # 0's removed.
         if isinstance(card_number, str):
             card_number = card_number.lstrip('0')
 
-        valid_cards = session.scalars(
-            select(CARDS)
-            .where(CARDS.Code == card_number)
-            .where(CARDS.LocGrp == self._lookup_info.location_group_id)
-        ).all()
+        with self._lookup_info.new_session() as session:
+            card: Optional[CARDS] = session.scalar(
+                select(CARDS)
+                .where(CARDS.Code == card_number)
+                .where(CARDS.LocGrp == self._lookup_info.location_group_id)
+            )
 
-        if len(valid_cards) == 0:
-            access_card = AccessCard(self._lookup_info, 0)
+        if card is None:
+            access_card = _new_access_card(self._lookup_info)
             access_card.card_number = card_number
             return access_card
 
-        card: CARDS = valid_cards[0]
-        return AccessCard(self._lookup_info, card.ID)
+        acl_group_combo = AclGroupComboLookup(self._lookup_info).by_id(card.AclGrpComboID)
+        return _existing_access_card(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
+
+    def by_id(self, card_id: int) -> 'AccessCard':
+        with self._lookup_info.new_session() as session:
+            card: Optional[CARDS] = session.scalar(
+                select(CARDS)
+                .where(CARDS.ID == card_id)
+                .where(CARDS.LocGrp == self._lookup_info.location_group_id)
+            )
+
+        if card is None:
+            return _new_access_card(self._lookup_info)
+
+        acl_group_combo = AclGroupComboLookup(self._lookup_info).by_id(card.AclGrpComboID)
+        return _existing_access_card(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
 
 
-class AccessCard(DbModel):
+class AccessCard(abc.ABC):
     active_stop_date = datetime(year=9999, month=12, day=31)  # If we're setting a card to active, this is the stop date
 
+    @property
+    @abc.abstractmethod
+    def in_db(self) -> bool: ...
+
+    @property
+    @abc.abstractmethod
+    def id(self) -> Optional[int]: ...
+
+    @property
+    @abc.abstractmethod
+    def card_number(self) -> Optional[int]: ...
+
+    @property
+    @abc.abstractmethod
+    def active(self) -> bool: ...
+
+    @property
+    @abc.abstractmethod
+    def person(self) -> Person: ...
+
+    @property
+    @abc.abstractmethod
+    def access(self) -> frozenset[str]: ...
+
+    @abc.abstractmethod
+    def with_access(self, *names) -> 'AccessCard': ...
+
+    @abc.abstractmethod
+    def without_access(self, *names) -> 'AccessCard': ...
+
+    @abc.abstractmethod
+    def write(self): ...
+
+
+class _AccessCard(AccessCard):
     def __init__(self,
                  lookup_info: LookupInfo,
-                 card_id: int
+                 card_id: Optional[int] = None,
+                 card_number: Optional[int] = None,
+                 name_id: Optional[int] = None,
+                 active: bool = False,
+                 acl_group_combo: Optional[AclGroupComboSet] = None,
                  ):
         self._lookup_info: LookupInfo = lookup_info
         self._location_group_id: int = self._lookup_info.location_group_id
-        self._session = Session(self._lookup_info.acs_engine)
-        self._card_id: int = card_id
-        self._card_number: Optional[int] = None
-        self._name_id: Optional[int] = None
+        self._card_id: Optional[int] = card_id
+        self._card_number: Optional[int] = card_number
+        self._name_id: Optional[int] = name_id
         self._person: Optional[Person] = None
-        self._active: Optional[bool] = None
-        self._acl_group_combo: AclGroupComboSet = AclGroupComboLookup(self._lookup_info).empty()
-        super().__init__()
+        self._active: bool = active
+        self._acl_group_combo: AclGroupComboSet = acl_group_combo if acl_group_combo is not None else AclGroupComboLookup(lookup_info).empty()
 
     @property
-    def id(self) -> int:
+    def in_db(self) -> bool:
+        return self._card_id is not None
+
+    @property
+    def id(self) -> Optional[int]:
         return self._card_id
 
     @property
-    def card_number(self) -> int:
+    def card_number(self) -> Optional[int]:
         return self._card_number
 
     @card_number.setter
@@ -114,38 +180,6 @@ class AccessCard(DbModel):
 
         return self
 
-    def _get_card_from_db(self) -> Optional[CARDS]:
-        return self._session.scalar(
-            select(CARDS)
-            .where(CARDS.ID == self._card_id)
-            .where(CARDS.LocGrp == self._location_group_id)
-        )
-
-    def _populate_from_db(self):
-        if self._card_id == 0:
-            # Card number isn't set here as the only reason to look up a card id of 0 is to make a new card. We want to
-            # let the consumer of this API set the card number, so we don't set it here.
-            self._name_id = None
-            self._active = False
-            self._in_db = False
-            return
-
-        card: CARDS = self._get_card_from_db()
-
-        if card is None:
-            # We shouldn't see this unless someone directly made an access card using a card id directly. Possible, but
-            # not the advised route. Still, it doesn't hurt to explicitly protect from this mistake.
-            self._name_id = None
-            self._active = False
-            self._in_db = False
-            return
-
-        self._card_number = int(card.Code)
-        self._name_id = card.NameID
-        self._active = card.Status
-        self._acl_group_combo = AclGroupComboLookup(self._lookup_info).by_id(card.AclGrpComboID)
-        self._in_db = True
-
     def write(self):
         if self._name_id is None:
             raise InvalidPersonForAccessCard("The person must be set for an access card")
@@ -157,36 +191,44 @@ class AccessCard(DbModel):
 
         today = datetime.combine(date.today(), datetime.min.time())
 
-        card: CARDS = self._get_card_from_db()
-        if card is None:
-            card = CARDS(
-                LocGrp=self._location_group_id,
-                Code=self._card_number,
-                CardNum=str(self._card_number),
-                StartDate=today,
+        with self._lookup_info.new_session() as session:
+            card: Optional[CARDS] = None
+            if self._card_id is not None:
+                card = session.scalar(
+                    select(CARDS)
+                    .where(CARDS.ID == self._card_id)
+                    .where(CARDS.LocGrp == self._location_group_id)
+                )
+
+            if card is None:
+                card = CARDS(
+                    LocGrp=self._location_group_id,
+                    Code=self._card_number,
+                    CardNum=str(self._card_number),
+                    StartDate=today,
+                )
+
+            card.NameID = self._name_id
+            card.AclGrpComboID = self._acl_group_combo.id
+            is_active: bool = len(self._acl_group_combo.names) > 0
+            card.Status = is_active
+
+            card.StopDate = AccessCard.active_stop_date if is_active else today
+
+            session.add(card)
+            session.commit()
+            # noinspection PyTypeChecker
+            self._card_id = card.ID
+
+            # Creating this object does everything we need it to.
+            _AccessControlListUpdater(
+                self._location_group_id,
+                self._card_id,
+                self._acl_group_combo.id,
+                session,
+                self._lookup_info.updated_callback
             )
 
-        card.NameID = self._name_id
-        card.AclGrpComboID = self._acl_group_combo.id
-        is_active: bool = len(self._acl_group_combo.names) > 0
-        card.Status = is_active
-
-        card.StopDate = AccessCard.active_stop_date if is_active else today
-
-        self._session.add(card)
-        self._session.commit()
-        self._card_id = card.ID
-
-        # Creating this object does everything we need it to.
-        _AccessControlListUpdater(
-            self._location_group_id,
-            self._card_id,
-            self._acl_group_combo.id,
-            self._session,
-            self._lookup_info.updated_callback
-        )
-
-        self._in_db = True
         self._lookup_info.updated_callback(self)
 
 
@@ -467,6 +509,27 @@ class _AccessControlListUpdater:
         loc_cards.CkSum = 0
 
         self._session.add(loc_cards)
-        self._session.commit()
+        self._session.flush()
 
-        self._update_callback(loc_cards)
+        update = LocCardUpdate(
+            id=loc_cards.ID,
+            card_id=loc_cards.CardID,
+            loc=loc_cards.Loc,
+            dl_flag=loc_cards.DlFlag,
+        )
+
+        self._session.commit()
+        self._update_callback(update)
+
+
+def _new_access_card(lookup_info: LookupInfo) -> AccessCard:
+    return _AccessCard(lookup_info)
+
+
+def _existing_access_card(lookup_info: LookupInfo,
+                          card_id: int,
+                          card_number: int,
+                          name_id: Optional[int],
+                          active: bool,
+                          acl_group_combo: AclGroupComboSet) -> AccessCard:
+    return _AccessCard(lookup_info, card_id, card_number, name_id, active, acl_group_combo)
