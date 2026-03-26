@@ -1,13 +1,11 @@
-import threading
 from datetime import timedelta
 from typing import Optional
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from card_automation_server.plugins.types import CardScan
 from card_automation_server.windsx.db.models import DEV, LOC
-from card_automation_server.windsx.lookup.utils import LookupInfo, DbModel
+from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.events import DoorStateUpdate, DoorState
 
 
@@ -16,71 +14,66 @@ class DoorLookup:
                  lookup_info: LookupInfo,
                  *door_ids: int):
         self._lookup_info: LookupInfo = lookup_info
-        self._location_group_id: int = lookup_info.location_group_id
-        self._session = Session(lookup_info.acs_engine)
-        self._door_ids = list(door_ids)
-        self._lock = threading.Lock()
-
-    def all(self) -> list['Door']:
-        statement = (
+        self._base_statement = (
             select(DEV)
             .join(LOC, LOC.Loc == DEV.Loc)
-            .where(LOC.LocGrp == self._location_group_id)
+            .where(LOC.LocGrp == lookup_info.location_group_id)
         )
-        if len(self._door_ids) > 0:
-            statement = statement.where(DEV.ID.in_(self._door_ids))
 
-        with self._lock:
-            dev = self._session.scalars(statement).all()
-        return [Door(self._lookup_info, d.ID) for d in dev]
+        if door_ids:
+            self._base_statement = self._base_statement.where(DEV.ID.in_(door_ids))
+
+    def all(self) -> list['Door']:
+        with self._lookup_info.new_session() as session:
+            devs = session.scalars(self._base_statement).all()
+            return [Door(self._lookup_info, d.ID, d.Name, d.Device, d.Loc) for d in devs]
 
     def by_id(self, id_: int) -> Optional['Door']:
-        doors = [d for d in self.all() if d.id == id_]
+        statement = self._base_statement.where(DEV.ID == id_)
 
-        if len(doors) == 0:
-            return None
-
-        return doors[0]
+        with self._lookup_info.new_session() as session:
+            dev = session.scalar(statement)
+            return Door(self._lookup_info, dev.ID, dev.Name, dev.Device, dev.Loc) if dev is not None else None
 
     def by_device_info(self, location_id: int, device_id: int) -> Optional['Door']:
-        doors = [
-            d for d in self.all()
-            if d.location_id == location_id and d.device_id == device_id
-        ]
+        statement = (
+            self._base_statement
+            .where(DEV.Loc == location_id)
+            .where(DEV.Device == device_id)
+        )
 
-        if len(doors) == 0:
-            return None
-
-        return doors[0]
+        with self._lookup_info.new_session() as session:
+            dev = session.scalar(statement)
+            return Door(self._lookup_info, dev.ID, dev.Name, dev.Device, dev.Loc) if dev is not None else None
 
     def by_card_scan(self, card_scan: CardScan) -> Optional['Door']:
         statement = (
-            select(DEV)
-            .join(LOC, LOC.Loc == DEV.Loc)
-            .where(LOC.LocGrp == self._location_group_id)
+            self._base_statement
             .where(DEV.Loc == card_scan.location_id)
             .where(DEV.Device == card_scan.device)
         )
-        if len(self._door_ids) > 0:
-            statement = statement.where(DEV.ID.in_(self._door_ids))
 
-        with self._lock:
-            dev = self._session.scalar(statement)
-        return Door(self._lookup_info, dev.ID) if dev is not None else None
+        with self._lookup_info.new_session() as session:
+            dev = session.scalar(statement)
+            return Door(self._lookup_info, dev.ID, dev.Name, dev.Device, dev.Loc) if dev is not None else None
 
 
-class Door(DbModel):
+class Door:
     def __init__(self,
                  lookup_info: LookupInfo,
-                 dev_id: int):
+                 dev_id: int,
+                 name: str,
+                 device_id: int,
+                 location_id: int):
         self._lookup_info: LookupInfo = lookup_info
-        self._location_group_id: int = lookup_info.location_group_id
-        self._session = Session(lookup_info.acs_engine)
         self._id = dev_id
-        self._name: Optional[str] = None
-        self._device_id: Optional[int] = None
-        self._location_id: Optional[int] = None
-        super().__init__()
+        self._name: str = name
+        self._device_id: int = device_id
+        self._location_id: int = location_id
+
+    @property
+    def in_db(self) -> bool:
+        return True
 
     @property
     def id(self) -> int:
@@ -97,19 +90,6 @@ class Door(DbModel):
     @property
     def location_id(self) -> int:
         return self._location_id
-
-    def _populate_from_db(self):
-        dev: DEV = self._session.scalar(
-            select(DEV)
-            .join(LOC, LOC.Loc == DEV.Loc)
-            .where(LOC.LocGrp == self._location_group_id)
-            .where(DEV.ID == self._id)
-        )
-
-        self._name = dev.Name
-        self._device_id = dev.Device
-        self._location_id = dev.Loc
-        self._in_db = True
 
     def open(self, timeout: Optional[timedelta] = None):
         self._lookup_info.updated_callback(DoorStateUpdate(
