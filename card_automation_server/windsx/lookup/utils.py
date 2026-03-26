@@ -2,6 +2,7 @@ import abc
 from typing import Optional, Callable, Any
 
 from sqlalchemy import Engine
+from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.engines import AcsEngine
 
@@ -11,7 +12,6 @@ class DbModel(abc.ABC):
         self._in_db: Optional[bool] = None
         self._populate_from_db()
 
-    @abc.abstractmethod
     def _populate_from_db(self):
         pass
 
@@ -34,6 +34,9 @@ class LookupInfo:
         self._acs_engine: Engine = acs_engine
         self._location_group_id = location_group_id
         self._updated_callback = updated_callback
+
+    def new_session(self) -> Session:
+        return Session(self._acs_engine)
 
     @property
     def acs_engine(self) -> Engine:
