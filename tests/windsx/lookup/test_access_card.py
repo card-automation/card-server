@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, InstrumentedAttribute, Mapped
 
 from card_automation_server.windsx.db.models import CARDS, DGRP, ACL, LocCards, LOC
 from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, InvalidPersonForAccessCard, \
-    LocCardUpdate
+    LocCardUpdate, ACTIVE_STOP_DATE
 from card_automation_server.windsx.lookup.person import Person, PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from tests.conftest import main_location_id, annex_location_id
@@ -289,7 +289,7 @@ class TestAccessCardWrite:
         card: CARDS = db_helper.card_by_id(access_card.id)
         assert card.Status
         assert card.StartDate < self.today  # We don't care what it is, just that it's earlier than today
-        assert card.StopDate == AccessCard.active_stop_date
+        assert card.StopDate == ACTIVE_STOP_DATE
 
     def test_rewriting_with_existing_access_level_sets_stop_date_to_forever(self,
                                                                             acs_updated_callback: Mock,
@@ -313,7 +313,7 @@ class TestAccessCardWrite:
         card: CARDS = db_helper.card_by_id(access_card.id)
         assert card.Status
         assert card.StartDate < self.today  # We don't care what it is, just that it's earlier than today
-        assert card.StopDate == AccessCard.active_stop_date
+        assert card.StopDate == ACTIVE_STOP_DATE
 
     def test_deactivating_a_card_sets_stop_date_to_today(self,
                                                          acs_updated_callback: Mock,

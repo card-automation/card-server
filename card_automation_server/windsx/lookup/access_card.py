@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 from dataclasses import dataclass
 from datetime import datetime, date
 from typing import Optional, Union, Callable, Any
@@ -72,52 +71,10 @@ class AccessCardLookup:
         return _AccessCard(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
 
 
-class AccessCard(abc.ABC):
-    active_stop_date = datetime(year=9999, month=12, day=31)  # If we're setting a card to active, this is the stop date
-
-    @property
-    @abc.abstractmethod
-    def in_db(self) -> bool: ...
-
-    @property
-    @abc.abstractmethod
-    def id(self) -> Optional[int]: ...
-
-    @property
-    @abc.abstractmethod
-    def card_number(self) -> Optional[int]: ...
-
-    @card_number.setter
-    @abc.abstractmethod
-    def card_number(self, value: Union[str, int]) -> None: ...
-
-    @property
-    @abc.abstractmethod
-    def active(self) -> bool: ...
-
-    @property
-    @abc.abstractmethod
-    def person(self) -> Optional[Person]: ...
-
-    @person.setter
-    @abc.abstractmethod
-    def person(self, value: Union[Person, int]) -> None: ...
-
-    @property
-    @abc.abstractmethod
-    def access(self) -> frozenset[str]: ...
-
-    @abc.abstractmethod
-    def with_access(self, *names) -> 'AccessCard': ...
-
-    @abc.abstractmethod
-    def without_access(self, *names) -> 'AccessCard': ...
-
-    @abc.abstractmethod
-    def write(self): ...
+ACTIVE_STOP_DATE = datetime(year=9999, month=12, day=31)  # If we're setting a card to active, this is the stop date
 
 
-class _AccessCard(AccessCard):
+class _AccessCard:
     def __init__(self,
                  lookup_info: LookupInfo,
                  card_id: Optional[int] = None,
@@ -163,12 +120,12 @@ class _AccessCard(AccessCard):
 
     @person.setter
     def person(self, value: Union[Person, int]):
-        if isinstance(value, Person):
-            self._person = value
-            self._name_id = value.id
-        else:
+        if isinstance(value, int):
             self._person = None
             self._name_id = value
+        else:
+            self._person = value
+            self._name_id = value.id
 
     @property
     def access(self) -> frozenset[str]:
@@ -223,7 +180,7 @@ class _AccessCard(AccessCard):
             is_active: bool = len(self._acl_group_combo.names) > 0
             card.Status = is_active
 
-            card.StopDate = AccessCard.active_stop_date if is_active else today
+            card.StopDate = ACTIVE_STOP_DATE if is_active else today
 
             session.add(card)
             session.commit()
@@ -240,6 +197,13 @@ class _AccessCard(AccessCard):
             )
 
         self._lookup_info.updated_callback(self)
+
+
+class _Unused:
+    pass
+
+
+AccessCard = Union[_AccessCard, _Unused]
 
 
 class _AccessControlListUpdater:
