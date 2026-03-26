@@ -25,10 +25,6 @@ class LookupInfo:
         return Session(self._acs_engine)
 
     @property
-    def acs_engine(self) -> Engine:
-        return self._acs_engine
-
-    @property
     def location_group_id(self) -> int:
         return self._location_group_id
 

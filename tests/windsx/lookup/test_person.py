@@ -2,13 +2,13 @@ import re
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import Engine, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import UdfName
-from card_automation_server.windsx.lookup.person import PersonLookup, Person, InvalidUdfName, MissingRequiredUserDefinedField, \
+from card_automation_server.windsx.lookup.person import PersonLookup, Person, InvalidUdfName, \
+    MissingRequiredUserDefinedField, \
     InvalidUdfSelection
-from card_automation_server.windsx.lookup.utils import LookupInfo
 from tests.conftest import location_group_id
 
 
