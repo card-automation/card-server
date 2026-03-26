@@ -27,7 +27,7 @@ class DbHelper:
     @property
     def _session(self) -> Session:
         # Using a property and a new session means we avoid caching issues in the test
-        return Session(self._lookup_info.acs_engine)
+        return self._lookup_info.new_session()
 
     def card_by_id(self, card_id: int) -> Optional[CARDS]:
         return self._session.scalar(
@@ -133,6 +133,9 @@ class TestAccessCardLookup:
         assert not access_card.in_db
         assert access_card.id is None
         assert access_card.card_number == 9999
+        assert not access_card.active
+        assert access_card.access == frozenset()
+        assert access_card.person is None
 
     def test_can_lookup_card_by_id(self,
                                    access_card_lookup: AccessCardLookup):
@@ -710,6 +713,7 @@ class TestAccessCardWrite:
                                              access_card_lookup: AccessCardLookup):
         access_card: AccessCard = access_card_lookup.new(9999)
         assert not access_card.in_db
+        assert access_card.person is None
 
         with pytest.raises(InvalidPersonForAccessCard):
             access_card.write()

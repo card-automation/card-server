@@ -30,7 +30,7 @@ class CardPushedWatcher(EventsWorker[_Events]):
     def __init__(self,
                  lookup_info: LookupInfo):
         self._lookup_info = lookup_info
-        self._acs_session = Session(self._lookup_info.acs_engine)
+        self._acs_session = self._lookup_info.new_session()
         self._loc_cards: dict[int, LocCardInfo] = {}
         self._card_ids_to_location_updates: dict[int, set[int]] = {}
 

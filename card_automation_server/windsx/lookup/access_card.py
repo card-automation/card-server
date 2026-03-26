@@ -87,6 +87,10 @@ class AccessCard(abc.ABC):
     @abc.abstractmethod
     def card_number(self) -> Optional[int]: ...
 
+    @card_number.setter
+    @abc.abstractmethod
+    def card_number(self, value: Union[str, int]) -> None: ...
+
     @property
     @abc.abstractmethod
     def active(self) -> bool: ...
@@ -94,6 +98,10 @@ class AccessCard(abc.ABC):
     @property
     @abc.abstractmethod
     def person(self) -> Optional[Person]: ...
+
+    @person.setter
+    @abc.abstractmethod
+    def person(self, value: Union[Person, int]) -> None: ...
 
     @property
     @abc.abstractmethod
@@ -513,6 +521,7 @@ class _AccessControlListUpdater:
         self._session.add(loc_cards)
         self._session.flush()
 
+        # noinspection PyTypeChecker
         update = LocCardUpdate(
             id=loc_cards.ID,
             card_id=loc_cards.CardID,

@@ -246,13 +246,25 @@ class Person(abc.ABC):
     @abc.abstractmethod
     def first_name(self) -> Optional[str]: ...
 
+    @first_name.setter
+    @abc.abstractmethod
+    def first_name(self, value: str) -> None: ...
+
     @property
     @abc.abstractmethod
     def last_name(self) -> Optional[str]: ...
 
+    @last_name.setter
+    @abc.abstractmethod
+    def last_name(self, value: str) -> None: ...
+
     @property
     @abc.abstractmethod
     def company_id(self) -> Optional[int]: ...
+
+    @company_id.setter
+    @abc.abstractmethod
+    def company_id(self, value: int) -> None: ...
 
     @property
     @abc.abstractmethod
