@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from sqlalchemy import Engine, create_engine, URL, StaticPool
+from sqlalchemy import Engine, create_engine, URL, StaticPool, NullPool
 
 
 class EngineFactory:
@@ -30,4 +30,4 @@ class EngineFactory:
             "access+pyodbc",
             query={"odbc_connect": connection_string}
         )
-        return create_engine(connection_url)
+        return create_engine(connection_url, poolclass=NullPool)
