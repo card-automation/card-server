@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from itertools import groupby
 from typing import Optional, Union, Iterable, Dict, Collection, List
 
