@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import abc
 import enum
 from typing import Optional, Any, Sequence, Union, Pattern
@@ -61,12 +59,12 @@ class _PersonSearchBase(abc.ABC):
         self._udf_criteria: dict[str, Union[str, Pattern[str]]] = {}
 
     @abc.abstractmethod
-    def _search_object(self) -> _PersonSearchBuilder:
+    def _search_object(self) -> "_PersonSearchBuilder":
         # This method allows the same methods to be on PersonLookup and _PersonSearchBuilder while allowing them to be
         # chained like a builder pattern and ensuring the PersonLookup can be re-used to find multiple people.
         pass
 
-    def by_name(self, first_name: str, last_name: str) -> _PersonSearchBuilder:
+    def by_name(self, first_name: str, last_name: str) -> "_PersonSearchBuilder":
         search: _PersonSearchBuilder = self._search_object()
 
         search._criteria[_SearchCriteria.FIRST_NAME] = first_name
@@ -74,7 +72,7 @@ class _PersonSearchBase(abc.ABC):
 
         return search
 
-    def by_udf(self, udf_name: str, udf_text: Union[str, Pattern[str]]) -> _PersonSearchBuilder:
+    def by_udf(self, udf_name: str, udf_text: Union[str, Pattern[str]]) -> "_PersonSearchBuilder":
         search: _PersonSearchBuilder = self._search_object()
 
         if _SearchCriteria.UDF not in search._criteria:
@@ -85,14 +83,14 @@ class _PersonSearchBase(abc.ABC):
 
         return search
 
-    def by_card(self, code: int) -> _PersonSearchBuilder:
+    def by_card(self, code: int) -> "_PersonSearchBuilder":
         search: _PersonSearchBuilder = self._search_object()
 
         search._criteria[_SearchCriteria.CARD_CODE] = code
 
         return search
 
-    def by_company(self, company: int) -> _PersonSearchBuilder:
+    def by_company(self, company: int) -> "_PersonSearchBuilder":
         search: _PersonSearchBuilder = self._search_object()
 
         search._criteria[_SearchCriteria.COMPANY_ID] = company
@@ -145,7 +143,7 @@ class _PersonSearchBase(abc.ABC):
 
         return name_ids_result
 
-    def find(self) -> list[Person]:
+    def find(self) -> list["Person"]:
         statement = select(NAMES).where(NAMES.LocGrp == self._location_group_id)
 
         criteria_key: _SearchCriteria
@@ -196,7 +194,7 @@ class _PersonSearchBase(abc.ABC):
 
 
 class _PersonSearchBuilder(_PersonSearchBase):
-    def _search_object(self) -> _PersonSearchBuilder:
+    def _search_object(self) -> "_PersonSearchBuilder":
         return self
 
 
@@ -204,13 +202,13 @@ class PersonLookup(_PersonSearchBase):
     def __init__(self, lookup_info: LookupInfo):
         super().__init__(lookup_info)
 
-    def _search_object(self) -> _PersonSearchBuilder:
+    def _search_object(self) -> "_PersonSearchBuilder":
         return _PersonSearchBuilder(self._lookup_info)
 
-    def new(self) -> Person:
+    def new(self) -> "Person":
         return _new_person(self._lookup_info)
 
-    def by_id(self, name_id: int) -> Optional[Person]:
+    def by_id(self, name_id: int) -> Optional["Person"]:
         with self._lookup_info.new_session() as session:
             name: Optional[NAMES] = session.scalar(
                 select(NAMES)
