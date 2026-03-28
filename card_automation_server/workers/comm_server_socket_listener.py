@@ -5,6 +5,7 @@ import time
 from logging.handlers import RotatingFileHandler
 
 from platformdirs import PlatformDirs
+from sentry_sdk import capture_exception
 
 from card_automation_server.config import Config
 from card_automation_server.workers.events import RawCommServerMessage
@@ -44,8 +45,20 @@ class CommServerSocketListener(ThreadedWorker[None]):
         self._caught_up = False
 
     def _run(self) -> None:
+        os_errors = 0
         while not self._keep_running.is_set():
-            result = self._send_request()
+            try:
+                result = self._send_request()
+                os_errors = 0
+            except OSError as e:
+                os_errors += 1
+                self._log.warning(f"OSError contacting comm server ({os_errors}/120): {e}")
+                if os_errors >= 120:
+                    self._log.warning(f"Logging OSError to sentry")
+                    capture_exception(e)
+                    os_errors = 0
+                time.sleep(0.5)
+                continue
 
             for line in result:
                 self._log.debug(f"< {line.rstrip('\r\n')}")
@@ -79,8 +92,15 @@ class CommServerSocketListener(ThreadedWorker[None]):
             s.sendall(f"{message}\r\n".encode('ascii'))
             s.shutdown(socket.SHUT_WR)
             content = bytearray()
+            recv_timeouts = 0
             while True:
-                response = s.recv(1024)
+                try:
+                    response = s.recv(1024)
+                except TimeoutError:
+                    recv_timeouts += 1
+                    if recv_timeouts >= 3:
+                        raise
+                    continue
                 if len(response) == 0:
                     break
                 content.extend(response)
