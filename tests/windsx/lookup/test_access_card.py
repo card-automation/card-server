@@ -262,7 +262,9 @@ class TestAccessCardWrite:
 
         access_card.write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 3
+        # Second and third call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
         access_card = access_card_lookup.by_card_number(2000)
 
         assert access_card.in_db
@@ -329,7 +331,9 @@ class TestAccessCardWrite:
             .without_access(_acl_name_tenant_2_access) \
             .write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 3
+        # Second and third call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
 
         card: CARDS = db_helper.card_by_id(access_card.id)
         assert not card.Status
@@ -542,7 +546,9 @@ class TestAccessCardWrite:
         assert not access_card.active
 
         ending_rows = acs_data_session.scalars(select(LocCards)).all()
-        assert len(starting_rows) == len(ending_rows)
+        # Card 5 had a LocCards entry for main_location_id but not annex_location_id. Deactivation creates entries for
+        # all locations, so a new row is added for the annex even though the card was never downloaded there.
+        assert len(starting_rows) + 1 == len(ending_rows)
 
         # Acl -1 because the card is set for deactivation
         loc_cards = db_helper.loc_cards(5, main_location_id, -1)
@@ -555,14 +561,14 @@ class TestAccessCardWrite:
         assert loc_cards.Acl3 == -1
         assert loc_cards.Acl4 == -1
 
-        assert acs_updated_callback.call_count == 2
-        # Called with loc_cards and access_card
+        assert acs_updated_callback.call_count == 3
+        # Called with loc_cards (one per location) and access_card
         acs_updated_callback.assert_called_with(access_card)
         loc_cards_calls = [x
                            for x in acs_updated_callback.call_args_list
                            if len(x.args) == 1 and isinstance(x.args[0], LocCardUpdate)]
-        assert len(loc_cards_calls) == 1
-        loc_cards_arg: LocCardUpdate = loc_cards_calls[0].args[0]
+        assert len(loc_cards_calls) == 2
+        loc_cards_arg: LocCardUpdate = next(x.args[0] for x in loc_cards_calls if x.args[0].loc == main_location_id)
         assert loc_cards_arg.id == loc_cards.ID
         assert loc_cards_arg.card_id == loc_cards.CardID
         assert loc_cards_arg.loc == loc_cards.Loc
@@ -704,7 +710,9 @@ class TestAccessCardWrite:
         access_card.person = person
         access_card.write()
 
-        acs_updated_callback.assert_called_once_with(access_card)
+        assert acs_updated_callback.call_count == 3
+        # Second and third call would be the loc_cards
+        acs_updated_callback.assert_called_with(access_card)
 
         assert access_card.in_db
         assert access_card.id != 0

@@ -432,7 +432,10 @@ class _AccessControlListUpdater:
             )
 
             if loc_cards is None:
-                continue
+                loc_cards = LocCards(
+                    Loc=location_id,
+                    CardID=self._card_id,
+                )
 
             self.__set_loc_cards_acls(loc_cards)
             self._location_ids_to_update.add(location_id)
