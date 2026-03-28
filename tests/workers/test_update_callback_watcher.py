@@ -1,8 +1,4 @@
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-from card_automation_server.windsx.db.models import LocCards
-from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, LocCardUpdate
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup, AclGroupComboSet
 from card_automation_server.windsx.lookup.person import PersonLookup
 from card_automation_server.workers.events import LocCardUpdated, AccessCardUpdated
@@ -37,17 +33,15 @@ class TestUpdateCallbackWatcher:
         # No emitted updates
         assert update_callback_watcher.outbound_queue.qsize() == 0
 
-    def test_loc_card(self, acs_data_session: Session):
+    def test_loc_card_update(self):
         update_callback_watcher = UpdateCallbackWatcher()
 
         assert update_callback_watcher.outbound_queue.qsize() == 0
 
         callback = update_callback_watcher.acs_updated_callback
 
-        loc_cards: LocCards = acs_data_session.scalar(
-            select(LocCards).where(LocCards.ID == 900)
-        )
-        callback(loc_cards)
+        loc_card_update = LocCardUpdate(id=900, card_id=5, loc=main_location_id, dl_flag=1)
+        callback(loc_card_update)
 
         assert update_callback_watcher.outbound_queue.qsize() == 1
 

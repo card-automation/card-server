@@ -1,7 +1,6 @@
 from typing import Callable, Any, Optional
 
-from card_automation_server.windsx.db.models import LocCards
-from card_automation_server.windsx.lookup.access_card import AccessCard
+from card_automation_server.windsx.lookup.access_card import AccessCard, LocCardUpdate
 from card_automation_server.workers.events import LocCardUpdated, AccessCardUpdated, DoorStateUpdate
 from card_automation_server.workers.utils import Worker
 
@@ -21,7 +20,7 @@ class UpdateCallbackWatcher(Worker):
         return self._acs_updated_callback
 
     def _acs_updated_callback(self, value: Any) -> None:
-        if isinstance(value, LocCards):
+        if isinstance(value, LocCardUpdate):
             self.__loc_cards(value)
 
         if isinstance(value, AccessCard):
@@ -30,11 +29,11 @@ class UpdateCallbackWatcher(Worker):
         if isinstance(value, DoorStateUpdate):
             self._outbound_event_queue.put(value)
 
-    def __loc_cards(self, value: LocCards):
+    def __loc_cards(self, value: LocCardUpdate):
         self._outbound_event_queue.put(LocCardUpdated(
-            id=value.ID,
-            card_id=value.CardID,
-            location_id=value.Loc
+            id=value.id,
+            card_id=value.card_id,
+            location_id=value.loc
         ))
 
     def __access_card(self, value: AccessCard):

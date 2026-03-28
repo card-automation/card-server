@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import Union, Sequence
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
+from card_automation_server.config import Config
 from card_automation_server.windsx.db.models import LocCards, LOC
 from card_automation_server.windsx.lookup.access_card import AccessCardLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
@@ -28,7 +28,9 @@ class LocCardInfo:
 
 class CardPushedWatcher(EventsWorker[_Events]):
     def __init__(self,
+                 config: Config,
                  lookup_info: LookupInfo):
+        self._logger = config.logger
         self._lookup_info = lookup_info
         self._acs_session = self._lookup_info.new_session()
         self._loc_cards: dict[int, LocCardInfo] = {}
@@ -76,9 +78,11 @@ class CardPushedWatcher(EventsWorker[_Events]):
             card_location_updated = False
             # If it was deleted, then that's an update for a card losing access
             if lc_id not in retrieved_cards:
+                self._logger.debug(f"LocCard {lc_id} (card {lc_info.card_id}) was deleted from DB")
                 card_location_updated = True
             else:
                 loc_card = [x for x in loc_cards if x.ID == lc_id][0]
+                self._logger.debug(f"LocCard {lc_id} (card {lc_info.card_id}) DlFlag={loc_card.DlFlag}")
 
                 if loc_card.DlFlag == 0:
                     card_location_updated = True
@@ -94,6 +98,7 @@ class CardPushedWatcher(EventsWorker[_Events]):
     def _notify_of_card_pushed(self):
         for card_id, locations in self._card_ids_to_location_updates.copy().items():
             if len(locations) > 0:
+                self._logger.debug(f"Card {card_id} still waiting on locations {locations}")
                 continue  # Not all locations have been updated yet
 
             card = AccessCardLookup(self._lookup_info).by_id(card_id)
@@ -110,6 +115,7 @@ class CardPushedWatcher(EventsWorker[_Events]):
             .where(LocCards.DlFlag != 0)
         ).all()
         for loc_card in pending_loc_cards:
+            self._logger.debug(f"Found pending LocCard {loc_card.ID} (card {loc_card.CardID}) DlFlag={loc_card.DlFlag}")
             loc_card_info = LocCardInfo(
                 id=loc_card.ID,
                 card_id=loc_card.CardID,
@@ -123,8 +129,10 @@ class CardPushedWatcher(EventsWorker[_Events]):
             return  # No need to add it a second time, we're still waiting for it to be pushed
 
         if loc_card_info.location_id not in self._locations:
+            self._logger.debug(f"LocCard {loc_card_info.id} skipped: location {loc_card_info.location_id} not in watched locations {self._locations}")
             return  # We don't watch over this location, ignore it
 
+        self._logger.debug(f"Watching LocCard {loc_card_info.id} (card {loc_card_info.card_id}, location {loc_card_info.location_id})")
         self._loc_cards[loc_card_info.id] = loc_card_info
 
         if loc_card_info.card_id not in self._card_ids_to_location_updates:
