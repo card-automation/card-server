@@ -55,10 +55,11 @@ class CardScanWatcher(EventsWorker[_Events]):
             if event.Event not in valid_event_codes:
                 continue
 
+            name_id = int(event.Opr)
             self._outbound_event_queue.put(
                 CardScanned(
                     card_scan=CardScan(
-                        name_id=int(event.Opr),
+                        name_id=None if name_id == 0 else name_id,
                         card_number=int(event.Code),
                         scan_time=event.TimeDate,
                         device=event.Dev,
