@@ -121,6 +121,25 @@ class TestAccessCardLookup:
         # If this count is wrong, did you add or remove a card in the test fixture for this location group?
         assert len(access_card_lookup.all()) == 7
 
+    def test_by_card_numbers_returns_multiple_cards(self, access_card_lookup: AccessCardLookup):
+        cards = access_card_lookup.by_card_numbers(3000, 200, 2002)
+
+        assert len(cards) == 3
+        ids = {c.id for c in cards}
+        assert ids == {1, 2, 5}
+
+    def test_by_card_numbers_skips_missing_card_numbers(self, access_card_lookup: AccessCardLookup):
+        cards = access_card_lookup.by_card_numbers(3000, 99999)
+
+        assert len(cards) == 1
+        assert cards[0].id == 1
+
+    def test_by_card_numbers_excludes_bad_location_group(self, access_card_lookup: AccessCardLookup):
+        cards = access_card_lookup.by_card_numbers(3000, 3001)
+
+        assert len(cards) == 1
+        assert cards[0].id == 1
+
     def test_new_card(self, access_card_lookup: AccessCardLookup):
         access_card: AccessCard = access_card_lookup.new()
 

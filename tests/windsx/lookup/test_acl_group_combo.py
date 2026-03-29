@@ -35,6 +35,26 @@ class TestAclGroupComboLookup:
     def test_lookup_by_id_that_does_not_exist(self, acl_group_combo_lookup: AclGroupComboLookup):
         assert acl_group_combo_lookup.by_id(99) is None
 
+    def test_by_ids_returns_matching_combos(self, acl_group_combo_lookup: AclGroupComboLookup):
+        combos = acl_group_combo_lookup.by_ids(100, 106)
+
+        assert len(combos) == 2
+        combo_map = {c.id: c for c in combos}
+        assert combo_map[100].names == frozenset({_master_access_level})
+        assert combo_map[106].names == frozenset({_main_building_access, _tenant_3})
+
+    def test_by_ids_skips_missing_combo_ids(self, acl_group_combo_lookup: AclGroupComboLookup):
+        combos = acl_group_combo_lookup.by_ids(100, 99999)
+
+        assert len(combos) == 1
+        assert combos[0].id == 100
+
+    def test_by_ids_excludes_bad_location_group(self, acl_group_combo_lookup: AclGroupComboLookup):
+        combos = acl_group_combo_lookup.by_ids(100, 200)
+
+        assert len(combos) == 1
+        assert combos[0].id == 100
+
     def test_lookup_by_name(self, acl_group_combo_lookup: AclGroupComboLookup):
         acl_group_combo: AclGroupComboSet = acl_group_combo_lookup.by_names(_tenant_1)
         assert acl_group_combo.id == 108

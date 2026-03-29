@@ -12,6 +12,15 @@ from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.events import LocCardUpdated
 
 
+@dataclass(frozen=True)
+class _CardRow:
+    id: int
+    code: int
+    name_id: int
+    status: bool
+    acl_grp_combo_id: int
+
+
 class InvalidPersonForAccessCard(Exception):
     pass
 
@@ -44,22 +53,43 @@ class AccessCardLookup:
         if card is None:
             return None
 
-        combo_lookup = AclGroupComboLookup(self._lookup_info)
-        acl_group_combo = combo_lookup.by_id(card.AclGrpComboID) or combo_lookup.empty()
-        return _AccessCard(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
+        row = _CardRow(card.ID, int(card.Code), card.NameID, card.Status, card.AclGrpComboID)
+        return self._build_access_cards(row)[0]
+
+    def by_card_numbers(self, *card_numbers: Union[int, str]) -> list['AccessCard']:
+        normalized = [
+            int(str(n).lstrip('0')) if isinstance(n, str) else n
+            for n in card_numbers
+        ]
+
+        with self._lookup_info.new_session() as session:
+            rows = [
+                _CardRow(row.ID, int(row.Code), row.NameID, row.Status, row.AclGrpComboID)
+                for row in session.scalars(
+                    self._base_statement.where(CARDS.Code.in_(normalized))
+                ).all()
+            ]
+
+        return self._build_access_cards(*rows)
 
     def all(self) -> list['AccessCard']:
         with self._lookup_info.new_session() as session:
-            cards = [
-                (row.ID, int(row.Code), row.NameID, row.Status, row.AclGrpComboID)
+            rows = [
+                _CardRow(row.ID, int(row.Code), row.NameID, row.Status, row.AclGrpComboID)
                 for row in session.scalars(self._base_statement).all()
             ]
 
+        return self._build_access_cards(*rows)
+
+    def _build_access_cards(self, *rows: _CardRow) -> list['AccessCard']:
         combo_lookup = AclGroupComboLookup(self._lookup_info)
+        combo_ids = {row.acl_grp_combo_id for row in rows}
+        combos = {c.id: c for c in combo_lookup.by_ids(*combo_ids)}
+
         return [
-            _AccessCard(self._lookup_info, card_id, code, name_id, status,
-                        combo_lookup.by_id(combo_id) or combo_lookup.empty())
-            for card_id, code, name_id, status, combo_id in cards
+            _AccessCard(self._lookup_info, row.id, row.code, row.name_id, row.status,
+                        combos.get(row.acl_grp_combo_id) or combo_lookup.empty())
+            for row in rows
         ]
 
     def by_id(self, card_id: int) -> Optional['AccessCard']:
@@ -71,9 +101,8 @@ class AccessCardLookup:
         if card is None:
             return None
 
-        combo_lookup = AclGroupComboLookup(self._lookup_info)
-        acl_group_combo = combo_lookup.by_id(card.AclGrpComboID) or combo_lookup.empty()
-        return _AccessCard(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
+        row = _CardRow(card.ID, int(card.Code), card.NameID, card.Status, card.AclGrpComboID)
+        return self._build_access_cards(row)[0]
 
 
 ACTIVE_STOP_DATE = datetime(year=9999, month=12, day=31)  # If we're setting a card to active, this is the stop date
