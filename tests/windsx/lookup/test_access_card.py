@@ -117,6 +117,10 @@ class TestAccessCardLookup:
         # This does exist in the DB, but only in an incorrect location group, so we treat it like it's not in the DB.
         assert access_card_lookup.by_card_number(3001) is None
 
+    def test_all_returns_all_cards(self, access_card_lookup: AccessCardLookup):
+        # If this count is wrong, did you add or remove a card in the test fixture for this location group?
+        assert len(access_card_lookup.all()) == 7
+
     def test_new_card(self, access_card_lookup: AccessCardLookup):
         access_card: AccessCard = access_card_lookup.new()
 

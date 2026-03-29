@@ -20,6 +20,10 @@ class AccessCardLookup:
     def __init__(self,
                  lookup_info: LookupInfo):
         self._lookup_info: LookupInfo = lookup_info
+        self._base_statement = (
+            select(CARDS)
+            .where(CARDS.LocGrp == lookup_info.location_group_id)
+        )
 
     def new(self, card_number: Optional[Union[int, str]] = None) -> 'AccessCard':
         if isinstance(card_number, str):
@@ -34,9 +38,7 @@ class AccessCardLookup:
 
         with self._lookup_info.new_session() as session:
             card: Optional[CARDS] = session.scalar(
-                select(CARDS)
-                .where(CARDS.Code == card_number)
-                .where(CARDS.LocGrp == self._lookup_info.location_group_id)
+                self._base_statement.where(CARDS.Code == card_number)
             )
 
         if card is None:
@@ -46,12 +48,24 @@ class AccessCardLookup:
         acl_group_combo = combo_lookup.by_id(card.AclGrpComboID) or combo_lookup.empty()
         return _AccessCard(self._lookup_info, card.ID, int(card.Code), card.NameID, card.Status, acl_group_combo)
 
+    def all(self) -> list['AccessCard']:
+        with self._lookup_info.new_session() as session:
+            cards = [
+                (row.ID, int(row.Code), row.NameID, row.Status, row.AclGrpComboID)
+                for row in session.scalars(self._base_statement).all()
+            ]
+
+        combo_lookup = AclGroupComboLookup(self._lookup_info)
+        return [
+            _AccessCard(self._lookup_info, card_id, code, name_id, status,
+                        combo_lookup.by_id(combo_id) or combo_lookup.empty())
+            for card_id, code, name_id, status, combo_id in cards
+        ]
+
     def by_id(self, card_id: int) -> Optional['AccessCard']:
         with self._lookup_info.new_session() as session:
             card: Optional[CARDS] = session.scalar(
-                select(CARDS)
-                .where(CARDS.ID == card_id)
-                .where(CARDS.LocGrp == self._lookup_info.location_group_id)
+                self._base_statement.where(CARDS.ID == card_id)
             )
 
         if card is None:
