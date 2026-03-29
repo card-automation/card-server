@@ -210,6 +210,22 @@ class PersonLookup(_PersonSearchBase):
     def new(self) -> "Person":
         return _new_person(self._lookup_info)
 
+    def by_ids(self, *name_ids: int) -> list["Person"]:
+        with self._lookup_info.new_session() as session:
+            names = session.scalars(
+                select(NAMES)
+                .where(NAMES.ID.in_(name_ids))
+                .where(NAMES.LocGrp == self._location_group_id)
+            ).all()
+
+            ids = [name.ID for name in names]
+            udf_data = _load_udfs(session, self._location_group_id, ids)
+
+            return [
+                _existing_person(self._lookup_info, name.ID, name.FName, name.LName, name.Company, udf_data[name.ID])
+                for name in names
+            ]
+
     def by_id(self, name_id: int) -> Optional["Person"]:
         with self._lookup_info.new_session() as session:
             name: Optional[NAMES] = session.scalar(

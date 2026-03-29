@@ -170,6 +170,26 @@ class TestPersonLookup:
     def test_lookup_by_invalid_id(self, person_lookup: PersonLookup):
         assert person_lookup.by_id(5555) is None
 
+    def test_by_ids_returns_matching_people(self, person_lookup: PersonLookup):
+        people = person_lookup.by_ids(101, 201)
+
+        assert len(people) == 2
+        ids = {p.id for p in people}
+        assert 101 in ids
+        assert 201 in ids
+
+    def test_by_ids_skips_missing_ids(self, person_lookup: PersonLookup):
+        people = person_lookup.by_ids(101, 99999)
+
+        assert len(people) == 1
+        assert people[0].id == 101
+
+    def test_by_ids_excludes_bad_location_group(self, person_lookup: PersonLookup):
+        people = person_lookup.by_ids(101, 1101)
+
+        assert len(people) == 1
+        assert people[0].id == 101
+
     def test_lookup_on_invalid_udf_name(self, person_lookup: PersonLookup):
         with pytest.raises(InvalidUdfName) as ex:
             person_lookup.by_udf("INVALID_UDF", "").find()
