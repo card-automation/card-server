@@ -103,6 +103,35 @@ class TestPersonLookup:
         person = [x for x in people if x.id == 201][0]
         self._assert_ray_securitay(person)
 
+    def test_lookup_by_missing_udf_text_returns_all_with_that_udf(self, person_lookup: PersonLookup):
+        people = person_lookup.by_udf("ID").find()
+
+        assert len(people) == 3
+
+        ids = {p.id for p in people}
+        assert 101 in ids
+        assert 110 in ids
+        assert 201 in ids
+
+    def test_lookup_by_missing_udf_text_with_single_match(self, person_lookup: PersonLookup):
+        people = person_lookup.by_udf("Fruit").find()
+
+        assert len(people) == 1
+
+        person = people[0]
+        self._assert_bob_the_building_manager(person)
+
+    def test_lookup_by_missing_udf_text_combined_with_text(self, person_lookup: PersonLookup):
+        people = person_lookup \
+            .by_udf("ID") \
+            .by_udf("Fruit", "Apple") \
+            .find()
+
+        assert len(people) == 1
+
+        person = people[0]
+        self._assert_bob_the_building_manager(person)
+
     def test_lookup_by_udf_select(self, person_lookup: PersonLookup):
         people = person_lookup.by_udf("Fruit", "Apple").find()
 

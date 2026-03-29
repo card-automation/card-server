@@ -72,7 +72,7 @@ class _PersonSearchBase(abc.ABC):
 
         return search
 
-    def by_udf(self, udf_name: str, udf_text: Union[str, Pattern[str]]) -> "_PersonSearchBuilder":
+    def by_udf(self, udf_name: str, udf_text: Union[str, Pattern[str], None] = None) -> "_PersonSearchBuilder":
         search: _PersonSearchBuilder = self._search_object()
 
         if _SearchCriteria.UDF not in search._criteria:
@@ -131,7 +131,9 @@ class _PersonSearchBase(abc.ABC):
 
             name_ids = set()
             for row in rows:
-                if isinstance(udf_text, str):
+                if udf_text is None:
+                    name_ids.add(row[0])  # No filter on text, accept all
+                elif isinstance(udf_text, str):
                     name_ids.add(row[0])  # We compared the string in the query search
                 elif udf_text.match(row[1]) is not None:
                     name_ids.add(row[0])  # We compared the string with regex
