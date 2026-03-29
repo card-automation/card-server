@@ -33,6 +33,11 @@ class AccessCardLookup:
             select(CARDS)
             .where(CARDS.LocGrp == lookup_info.location_group_id)
         )
+        self._eager_load_people: bool = False
+
+    def with_people(self) -> 'AccessCardLookup':
+        self._eager_load_people = True
+        return self
 
     def new(self, card_number: Optional[Union[int, str]] = None) -> 'AccessCard':
         if isinstance(card_number, str):
@@ -81,17 +86,6 @@ class AccessCardLookup:
 
         return self._build_access_cards(*rows)
 
-    def _build_access_cards(self, *rows: _CardRow) -> list['AccessCard']:
-        combo_lookup = AclGroupComboLookup(self._lookup_info)
-        combo_ids = {row.acl_grp_combo_id for row in rows}
-        combos = {c.id: c for c in combo_lookup.by_ids(*combo_ids)}
-
-        return [
-            _AccessCard(self._lookup_info, row.id, row.code, row.name_id, row.status,
-                        combos.get(row.acl_grp_combo_id) or combo_lookup.empty())
-            for row in rows
-        ]
-
     def by_id(self, card_id: int) -> Optional['AccessCard']:
         with self._lookup_info.new_session() as session:
             card: Optional[CARDS] = session.scalar(
@@ -103,6 +97,25 @@ class AccessCardLookup:
 
         row = _CardRow(card.ID, int(card.Code), card.NameID, card.Status, card.AclGrpComboID)
         return self._build_access_cards(row)[0]
+
+    def _build_access_cards(self, *rows: _CardRow) -> list['AccessCard']:
+        combo_lookup = AclGroupComboLookup(self._lookup_info)
+        combo_ids = {row.acl_grp_combo_id for row in rows}
+        combos = {c.id: c for c in combo_lookup.by_ids(*combo_ids)}
+
+        cards = [
+            _AccessCard(self._lookup_info, row.id, row.code, row.name_id, row.status,
+                        combos.get(row.acl_grp_combo_id) or combo_lookup.empty())
+            for row in rows
+        ]
+
+        if self._eager_load_people:
+            name_ids = [row.name_id for row in rows]
+            people = {p.id: p for p in PersonLookup(self._lookup_info).by_ids(*name_ids)}
+            for card in cards:
+                card.person = people.get(card.name_id)
+
+        return cards
 
 
 ACTIVE_STOP_DATE = datetime(year=9999, month=12, day=31)  # If we're setting a card to active, this is the stop date
@@ -145,6 +158,10 @@ class _AccessCard:
     @property
     def active(self) -> bool:
         return self._active
+
+    @property
+    def name_id(self) -> Optional[int]:
+        return self._name_id
 
     @property
     def person(self) -> Optional[Person]:

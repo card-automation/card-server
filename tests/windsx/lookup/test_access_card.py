@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from typing import Optional, Sequence, Union
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 import pytest
 from sqlalchemy import select
@@ -120,6 +120,14 @@ class TestAccessCardLookup:
     def test_all_returns_all_cards(self, access_card_lookup: AccessCardLookup):
         # If this count is wrong, did you add or remove a card in the test fixture for this location group?
         assert len(access_card_lookup.all()) == 7
+
+    def test_with_people_eager_loads_persons(self, access_card_lookup: AccessCardLookup):
+        cards = access_card_lookup.with_people().by_card_numbers(3000, 200)
+
+        with patch('card_automation_server.windsx.lookup.access_card.PersonLookup', side_effect=Exception("should not be called")):
+            card_map = {c.id: c for c in cards}
+            assert card_map[1].person.id == 101
+            assert card_map[2].person.id == 110
 
     def test_by_card_numbers_returns_multiple_cards(self, access_card_lookup: AccessCardLookup):
         cards = access_card_lookup.by_card_numbers(3000, 200, 2002)
