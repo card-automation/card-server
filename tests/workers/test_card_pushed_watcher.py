@@ -4,8 +4,9 @@ import pytest
 from sqlalchemy import select, Engine
 from sqlalchemy.orm import Session
 
+from card_automation_server.config import Config
 from card_automation_server.windsx.db.models import LocCards
-from card_automation_server.windsx.lookup.access_card import AccessCard, AccessCardLookup
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.card_pushed_watcher import CardPushedWatcher
 from card_automation_server.workers.events import AcsDatabaseUpdated, AccessCardUpdated, AccessCardPushed, \
@@ -15,10 +16,11 @@ from tests.conftest import acs_data_session, main_location_id, bad_main_location
 
 @pytest.fixture
 def card_pushed_watcher(
+        app_config: Config,
         acs_data_engine: Engine,  # Unused, but it populates the tables
         lookup_info: LookupInfo
 ) -> Generator[CardPushedWatcher, None, None]:
-    worker = CardPushedWatcher(lookup_info)
+    worker = CardPushedWatcher(app_config, lookup_info)
     worker.start()
 
     yield worker

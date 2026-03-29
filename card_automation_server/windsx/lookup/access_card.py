@@ -9,14 +9,7 @@ from card_automation_server.windsx.db.models import CARDS, LOC, AclGrpName, AclG
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupComboLookup
 from card_automation_server.windsx.lookup.person import Person, PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
-
-
-@dataclass(frozen=True)
-class LocCardUpdate:
-    id: int
-    card_id: int
-    loc: int
-    dl_flag: int
+from card_automation_server.workers.events import LocCardUpdated
 
 
 class InvalidPersonForAccessCard(Exception):
@@ -486,15 +479,11 @@ class _AccessControlListUpdater:
         self._session.add(loc_cards)
         self._session.flush()
 
-        # noinspection PyTypeChecker
-        update = LocCardUpdate(
+        self._session.commit()
+        self._update_callback(LocCardUpdated(
             id=loc_cards.ID,
             card_id=loc_cards.CardID,
-            loc=loc_cards.Loc,
-            dl_flag=loc_cards.DlFlag,
-        )
-
-        self._session.commit()
-        self._update_callback(update)
+            location_id=loc_cards.Loc,
+        ))
 
 

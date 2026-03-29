@@ -3,10 +3,12 @@ import enum
 import typing
 from dataclasses import dataclass
 from datetime import timedelta, datetime
-from typing import Optional, Union
+from typing import Optional, Union, TYPE_CHECKING
 
 from card_automation_server.plugins.types import CardScan, CommServerMessageType, CommServerEventType
-from card_automation_server.windsx.lookup.access_card import AccessCard
+
+if TYPE_CHECKING:
+    from card_automation_server.windsx.lookup.access_card import AccessCard
 
 
 class WorkerEvent(abc.ABC):
@@ -39,11 +41,11 @@ class AccessCardUpdated(WorkerEvent):
     This event is fired when the access card is updated in the Acs database.
     """
 
-    def __init__(self, access_card: AccessCard):
+    def __init__(self, access_card: "AccessCard"):
         self._access_card = access_card
 
     @property
-    def access_card(self) -> AccessCard:
+    def access_card(self) -> "AccessCard":
         return self._access_card
 
 
@@ -79,11 +81,11 @@ class AccessCardPushed(WorkerEvent):
     This event is fired after the card has been written to the hardware.
     """
 
-    def __init__(self, access_card: AccessCard):
+    def __init__(self, access_card: "AccessCard"):
         self._access_card = access_card
 
     @property
-    def access_card(self) -> AccessCard:
+    def access_card(self) -> "AccessCard":
         return self._access_card
 
 

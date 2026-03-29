@@ -1,4 +1,4 @@
-from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, LocCardUpdate
+from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup, AclGroupComboSet
 from card_automation_server.windsx.lookup.person import PersonLookup
 from card_automation_server.workers.events import LocCardUpdated, AccessCardUpdated
@@ -40,7 +40,7 @@ class TestUpdateCallbackWatcher:
 
         callback = update_callback_watcher.acs_updated_callback
 
-        loc_card_update = LocCardUpdate(id=900, card_id=5, loc=main_location_id, dl_flag=1)
+        loc_card_update = LocCardUpdated(id=900, card_id=5, location_id=main_location_id)
         callback(loc_card_update)
 
         assert update_callback_watcher.outbound_queue.qsize() == 1
