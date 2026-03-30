@@ -47,13 +47,16 @@ class ConfigProperty(Generic[T]):
             new_base_type, new_arg_type = cls._base_and_arg_type(arg_type)
             return [cls._from_serializable_type(x, new_base_type, new_arg_type) for x in value]
 
-
         if base_type == set:
             return set(value)
 
         return value
 
     def __get__(self, instance, owner) -> Optional[T]:
+        # Access on the owner class and not on the instance
+        if instance is None:
+            return self
+
         # noinspection PyProtectedMember
         config = instance._config
 
@@ -137,6 +140,10 @@ class ConfigHolder(abc.ABC):
                 args = attr_type.__args__
                 if len(args) != 1:
                     raise Exception("Config property must have exactly one argument type")
+
+                if hasattr(self.__class__, attr_name) and \
+                        isinstance(getattr(self.__class__, attr_name), ConfigProperty):
+                    continue  # ConfigProperty was already setup before
 
                 default_value = None
                 if hasattr(self, attr_name):

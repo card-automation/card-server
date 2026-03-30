@@ -287,3 +287,20 @@ class TestConfig:
     def test_nested_manual_setup_is_run(self, config_factory: ConfigFactory):
         config = config_factory()
         assert config.nested.manual_config_was_run
+
+    def test_property_default_not_contaminated_after_reload(self, config_factory: ConfigFactory, tmp_path: Path):
+      # Set a value and reload from the same file
+      config = config_factory()
+      config.str_property = "some value"
+      config.write()
+
+      # This reload ensures that "some value" is written to str_property in the failure case, instead of it being
+      # reliant on other tests for failure. If the code works, it's a no-op as creating the config again below with the
+      # new root does the same operations.
+      _ = config_factory()
+
+      # A fresh instance from a different path should NOT see "some value"
+      new_root = tmp_path / "fresh"
+      new_root.mkdir(parents=True, exist_ok=True)
+      fresh_config = ConfigUnderTest(new_root)
+      assert fresh_config.str_property is None
