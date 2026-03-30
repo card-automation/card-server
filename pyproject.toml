@@ -1,0 +1,43 @@
+[project]
+name = "card-automation-server"
+version = "1.0.0"
+description = "WinDSX Card Automation Server"
+readme = "readme.md"
+license = "MIT"
+authors = [
+    { name = "Justin Nesselrotte", email = "admin@jnesselr.org" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "githubkit",
+    "platformdirs",
+    "psutil",
+    "pyodbc",
+    "requests",
+    "sentry-sdk==2.8.0",
+    "SQLAlchemy",
+    "sqlalchemy-access",
+    "tomlkit",
+    "typing-extensions",
+    "watchdog",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+override-dependencies = [
+    "pywin32; sys_platform == 'win32'",
+]
+
+[tool.setuptools.packages.find]
+include = ["card_automation_server*"]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
