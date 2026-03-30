@@ -8,8 +8,8 @@ from card_automation_server.plugins.config import ConfigHolder, BaseConfig, Conf
 
 
 class TestEnum(enum.Enum):
-    APPLE = "apple"
     PEAR = enum.auto()
+    APPLE = "apple"
 
 
 class InheritanceConfig(ConfigHolder):
