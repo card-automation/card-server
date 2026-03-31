@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from card_automation_server.windsx.db.models import CARDS, LOC, AclGrpName, AclGrpCombo, AclGrp, DGRP, ACL, LocCards
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboSet, AclGroupComboLookup
 from card_automation_server.windsx.lookup.person import Person, PersonLookup
-from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.windsx.lookup.utils import LookupInfo, chunked
 from card_automation_server.workers.events import LocCardUpdated
 
 
@@ -67,13 +67,15 @@ class AccessCardLookup:
             for n in card_numbers
         ]
 
+        rows = []
         with self._lookup_info.new_session() as session:
-            rows = [
-                _CardRow(row.ID, int(row.Code), row.NameID, row.Status, row.AclGrpComboID)
-                for row in session.scalars(
-                    self._base_statement.where(CARDS.Code.in_(normalized))
-                ).all()
-            ]
+            for chunk in chunked(normalized):
+                rows.extend(
+                    _CardRow(row.ID, int(row.Code), row.NameID, row.Status, row.AclGrpComboID)
+                    for row in session.scalars(
+                        self._base_statement.where(CARDS.Code.in_(chunk))
+                    ).all()
+                )
 
         return self._build_access_cards(*rows)
 

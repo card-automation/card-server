@@ -1,4 +1,13 @@
-from typing import Callable, Any
+from typing import Callable, Any, TypeVar, Generator
+
+T = TypeVar('T')
+
+_CHUNK_SIZE = 100
+
+
+def chunked(items: list[T], size: int = _CHUNK_SIZE) -> Generator[list[T], None, None]:
+    for i in range(0, len(items), size):
+        yield items[i:i + size]
 
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session

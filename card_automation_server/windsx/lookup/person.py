@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import NAMES, UDF, UdfName, CARDS, UdfSel
-from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.windsx.lookup.utils import LookupInfo, chunked
 
 
 class InvalidUdfName(Exception):
@@ -37,17 +37,16 @@ class _SearchCriteria(enum.Enum):
 
 
 def _load_udfs(session: Session, location_group_id: int, name_ids: list[int]) -> dict[int, dict[str, str]]:
-    udf_rows = session.execute(
-        select(UdfName.Name, UDF.UdfText, UDF.NameID)
-        .join(UDF, UDF.UdfNum == UdfName.UdfNum)
-        .where(UdfName.LocGrp == location_group_id)
-        .where(UDF.LocGrp == location_group_id)
-        .where(UDF.NameID.in_(name_ids))
-    ).all()
-
     result: dict[int, dict[str, str]] = {name_id: {} for name_id in name_ids}
-    for row in udf_rows:
-        result[row.NameID][row.Name] = row.UdfText
+    for chunk in chunked(name_ids):
+        for row in session.execute(
+            select(UdfName.Name, UDF.UdfText, UDF.NameID)
+            .join(UDF, UDF.UdfNum == UdfName.UdfNum)
+            .where(UdfName.LocGrp == location_group_id)
+            .where(UDF.LocGrp == location_group_id)
+            .where(UDF.NameID.in_(chunk))
+        ).all():
+            result[row.NameID][row.Name] = row.UdfText
     return result
 
 
@@ -212,11 +211,13 @@ class PersonLookup(_PersonSearchBase):
 
     def by_ids(self, *name_ids: int) -> list["Person"]:
         with self._lookup_info.new_session() as session:
-            names = session.scalars(
-                select(NAMES)
-                .where(NAMES.ID.in_(name_ids))
-                .where(NAMES.LocGrp == self._location_group_id)
-            ).all()
+            names = []
+            for chunk in chunked(list(name_ids)):
+                names.extend(session.scalars(
+                    select(NAMES)
+                    .where(NAMES.ID.in_(chunk))
+                    .where(NAMES.LocGrp == self._location_group_id)
+                ).all())
 
             ids = [name.ID for name in names]
             udf_data = _load_udfs(session, self._location_group_id, ids)

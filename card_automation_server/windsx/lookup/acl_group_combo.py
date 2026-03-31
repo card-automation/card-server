@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import AclGrpCombo, AclGrpName
-from card_automation_server.windsx.lookup.utils import LookupInfo
+from card_automation_server.windsx.lookup.utils import LookupInfo, chunked
 
 StringOrFrozenSet = Union[str, frozenset[str], Iterable[str]]
 
@@ -57,20 +57,19 @@ class AclGroupComboLookup:
             return _AclGroupComboSet(self._lookup_info, combo_id, names)
 
     def by_ids(self, *combo_ids: int) -> List['AclGroupComboSet']:
+        combos: Dict[int, frozenset[str]] = {}
         with self._lookup_info.new_session() as session:
-            rows = session.execute(
-                self._base_statement.where(AclGrpCombo.ComboID.in_(combo_ids))
-            ).all()
+            for chunk in chunked(list(combo_ids)):
+                for row in session.execute(
+                    self._base_statement.where(AclGrpCombo.ComboID.in_(chunk))
+                ).all():
+                    combo_id, name = row.ComboID, row.Name
+                    combos[combo_id] = combos.get(combo_id, frozenset()) | {name}
 
-            combos: Dict[int, frozenset[str]] = {}
-            for row in rows:
-                combo_id, name = row.ComboID, row.Name
-                combos[combo_id] = combos.get(combo_id, frozenset()) | {name}
-
-            return [
-                _AclGroupComboSet(self._lookup_info, combo_id, names)
-                for combo_id, names in combos.items()
-            ]
+        return [
+            _AclGroupComboSet(self._lookup_info, combo_id, names)
+            for combo_id, names in combos.items()
+        ]
 
     def all(self) -> List['AclGroupComboSet']:
         with self._lookup_info.new_session() as session:
