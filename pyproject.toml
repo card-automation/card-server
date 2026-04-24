@@ -18,6 +18,7 @@ dependencies = [
     "SQLAlchemy",
     "sqlalchemy-access",
     "tomlkit",
+    "type-ioc>=0.1.0",
     "typing-extensions",
     "watchdog",
 ]

@@ -54,6 +54,7 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "sqlalchemy-access" },
     { name = "tomlkit" },
+    { name = "type-ioc" },
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
@@ -74,6 +75,7 @@ requires-dist = [
     { name = "sqlalchemy" },
     { name = "sqlalchemy-access" },
     { name = "tomlkit" },
+    { name = "type-ioc", specifier = ">=0.1.0" },
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
@@ -886,6 +888,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/c3/af/14b24e41977adb296d6bd1fb59402cf7d60ce364f90c890bd2ec65c43b5a/tomlkit-0.14.0.tar.gz", hash = "sha256:cf00efca415dbd57575befb1f6634c4f42d2d87dbba376128adb42c121b87064", size = 187167 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b5/11/87d6d29fb5d237229d67973a6c9e06e048f01cf4994dee194ab0ea841814/tomlkit-0.14.0-py3-none-any.whl", hash = "sha256:592064ed85b40fa213469f81ac584f67a4f2992509a7c3ea2d632208623a3680", size = 39310 },
+]
+
+[[package]]
+name = "type-ioc"
+version = "0.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/22/d5fe9d9bf748335649010169656a5f4b59af4dadc68dde60ffd908d6a540/type_ioc-0.1.0.tar.gz", hash = "sha256:d52bccf39a10bcf6ed20bf515aba0b9a054345a4f92ffc3966702695ba4fb20e", size = 25633 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/78/e3/6de93e71a1fc7966622728552065fc1c03accd247e1a6e958373e80235d9/type_ioc-0.1.0-py3-none-any.whl", hash = "sha256:7111c1d99094abc3c797d95b8aa63cf395ab26aa959cf54088565c00726d40b1", size = 8867 },
 ]
 
 [[package]]

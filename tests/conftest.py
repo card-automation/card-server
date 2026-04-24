@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from typing_extensions import TypeVar
 
 from card_automation_server.config import Config
-from card_automation_server.ioc import Resolver
+from ioc import Resolver
 from card_automation_server.plugins.interfaces import Plugin
 from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.db.models import *

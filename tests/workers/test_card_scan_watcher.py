@@ -5,7 +5,7 @@ from sqlalchemy import Engine
 from sqlalchemy.orm import Session
 
 from card_automation_server.config import Config
-from card_automation_server.ioc import Resolver
+from ioc import Resolver
 from card_automation_server.plugins.types import CommServerEventType
 from card_automation_server.windsx.db.models import EvnLog
 from card_automation_server.workers.card_scan_watcher import CardScanWatcher
