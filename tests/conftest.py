@@ -181,6 +181,29 @@ def table_timezone(session: Session):
     ])
 
 
+def table_holiday(session: Session):
+    # Group consistency: each (date, slot) holiday in the main group exists in every Loc of that group.
+    # The bad_location_group entry shares a date with a good-group holiday so filter bugs are caught.
+    session.add_all([
+        # Main group, Loc=main, slot 1
+        HOL(ID=2001, Loc=main_location_id, HolDate=datetime(2026, 12, 25), Type=1, Name="Christmas", DlFlag=0,
+            Notes="", ReOccurring=False),
+        # Main group, Loc=annex, slot 1 (mirror)
+        HOL(ID=2002, Loc=annex_location_id, HolDate=datetime(2026, 12, 25), Type=1, Name="Christmas", DlFlag=0,
+            Notes="", ReOccurring=False),
+        # Main group, Loc=main, slot 2
+        HOL(ID=2003, Loc=main_location_id, HolDate=datetime(2026, 7, 4), Type=2, Name="Independence Day", DlFlag=0,
+            Notes="", ReOccurring=False),
+        # Main group, Loc=annex, slot 2 (mirror)
+        HOL(ID=2004, Loc=annex_location_id, HolDate=datetime(2026, 7, 4), Type=2, Name="Independence Day", DlFlag=0,
+            Notes="", ReOccurring=False),
+
+        # Bad location group: same date as a real holiday, must be filtered out by all reads.
+        HOL(ID=2999, Loc=bad_main_location_id, HolDate=datetime(2026, 12, 25), Type=3, Name="Bad Group Holiday",
+            DlFlag=0, Notes="", ReOccurring=False),
+    ])
+
+
 def table_devices(session: Session):
     session.add_all([
         DEV(ID=0, Loc=main_location_id, Device=0, Name='Main Door'),
@@ -449,6 +472,7 @@ def acs_data_engine(request: FixtureRequest) -> Engine:
     table_location_group(session)
     table_location(session)
     table_timezone(session)
+    table_holiday(session)
     table_devices(session)
     table_acl_group(session)
     table_acl_group_name(session)
