@@ -1,15 +1,17 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, delete, select
 from sqlalchemy.orm import Session
 
 from card_automation_server.windsx.db.models import HOL, LOC
 from card_automation_server.windsx.lookup.holiday import (
     HolidayLookup,
     Holiday,
+    HolidayDateConflict,
     HolidayNotInDatabase,
+    NoFreeHolidaySlotError,
     NoLocationsInGroup,
 )
 from card_automation_server.windsx.lookup.utils import LookupInfo
@@ -284,6 +286,165 @@ class TestHolidayDelete:
 
         with pytest.raises(HolidayNotInDatabase):
             holiday.delete()
+
+
+class TestHolidayAllocate:
+    @pytest.fixture
+    def empty_holiday_calendar(self, acs_data_session: Session) -> None:
+        acs_data_session.execute(delete(HOL))
+        acs_data_session.commit()
+
+    @pytest.fixture
+    def today(self) -> date:
+        return date.today()
+
+    @pytest.fixture
+    def future_a(self, today: date) -> date:
+        return today + timedelta(days=300)
+
+    @pytest.fixture
+    def future_b(self, today: date) -> date:
+        return today + timedelta(days=400)
+
+    @pytest.fixture
+    def future_c(self, today: date) -> date:
+        return today + timedelta(days=500)
+
+    @staticmethod
+    def _seed_holiday(session: Session, holiday_date: date, slot: int) -> None:
+        for loc in (main_location_id, annex_location_id):
+            session.add(HOL(
+                Loc=loc,
+                HolDate=datetime.combine(holiday_date, datetime.min.time()),
+                Type=slot,
+                Name=f"Seed slot {slot}",
+                Notes="",
+                ReOccurring=False,
+            ))
+        session.commit()
+
+    def test_allocate_picks_slot_1_when_calendar_is_empty(
+        self,
+        holiday_lookup: HolidayLookup,
+        empty_holiday_calendar: None,
+        future_a: date,
+    ):
+        holiday = holiday_lookup.allocate(future_a, "Open House A")
+
+        assert holiday.in_db
+        assert holiday.slot == 1
+        assert holiday.date == future_a
+        assert holiday.name == "Open House A"
+
+    def test_allocate_picks_first_free_slot(
+        self,
+        holiday_lookup: HolidayLookup,
+        empty_holiday_calendar: None,
+        acs_data_session: Session,
+        future_a: date,
+        future_b: date,
+        future_c: date,
+    ):
+        self._seed_holiday(acs_data_session, future_a, slot=1)
+        self._seed_holiday(acs_data_session, future_b, slot=2)
+
+        holiday = holiday_lookup.allocate(future_c, "Open House C")
+
+        assert holiday.slot == 3
+
+    def test_allocate_raises_when_all_three_slots_future_occupied(
+        self,
+        holiday_lookup: HolidayLookup,
+        empty_holiday_calendar: None,
+        acs_data_session: Session,
+        today: date,
+        future_a: date,
+        future_b: date,
+        future_c: date,
+    ):
+        self._seed_holiday(acs_data_session, future_a, slot=1)
+        self._seed_holiday(acs_data_session, future_b, slot=2)
+        self._seed_holiday(acs_data_session, future_c, slot=3)
+
+        with pytest.raises(NoFreeHolidaySlotError):
+            holiday_lookup.allocate(today + timedelta(days=42), "Won't fit")
+
+    def test_allocate_raises_on_same_date_conflict(
+        self,
+        holiday_lookup: HolidayLookup,
+        empty_holiday_calendar: None,
+        acs_data_session: Session,
+        future_a: date,
+    ):
+        self._seed_holiday(acs_data_session, future_a, slot=2)
+
+        with pytest.raises(HolidayDateConflict):
+            holiday_lookup.allocate(future_a, "Same day, different request")
+
+    def test_allocate_reuses_slot_with_only_past_entries(
+        self,
+        holiday_lookup: HolidayLookup,
+        empty_holiday_calendar: None,
+        acs_data_session: Session,
+        today: date,
+        future_a: date,
+    ):
+        past = today - timedelta(days=30)
+        self._seed_holiday(acs_data_session, past, slot=1)
+
+        holiday = holiday_lookup.allocate(future_a, "Reuse stale slot")
+
+        assert holiday.slot == 1
+
+    def test_allocate_writes_a_row_per_loc_in_group(
+        self,
+        holiday_lookup: HolidayLookup,
+        empty_holiday_calendar: None,
+        acs_data_session: Session,
+        future_a: date,
+    ):
+        holiday = holiday_lookup.allocate(future_a, "Open House")
+
+        rows = acs_data_session.scalars(
+            select(HOL)
+            .join(LOC, LOC.Loc == HOL.Loc)
+            .where(LOC.LocGrp == location_group_id)
+            .where(HOL.HolDate == datetime.combine(future_a, datetime.min.time()))
+        ).all()
+        assert {r.Loc for r in rows} == {main_location_id, annex_location_id}
+        for row in rows:
+            assert row.Name == "Open House"
+            assert row.Type == holiday.slot
+            assert row.DlFlag == 1
+            assert row.CkSum == 0
+
+        roundtrip = holiday_lookup.by_date(future_a)
+        assert roundtrip is not None
+        assert roundtrip.slot == holiday.slot
+        assert roundtrip.name == "Open House"
+
+    def test_allocate_ignores_other_location_group(
+        self,
+        holiday_lookup: HolidayLookup,
+        empty_holiday_calendar: None,
+        acs_data_session: Session,
+        future_a: date,
+    ):
+        # An entry in a different location group must not block allocation in our group.
+        acs_data_session.add(HOL(
+            Loc=bad_main_location_id,
+            HolDate=datetime.combine(future_a, datetime.min.time()),
+            Type=1,
+            Name="Other Group",
+            Notes="",
+            ReOccurring=False,
+        ))
+        acs_data_session.commit()
+
+        holiday = holiday_lookup.allocate(future_a, "Mine")
+
+        assert holiday.in_db
+        assert holiday.slot == 1
 
 
 class TestHolidayEmptyGroup:

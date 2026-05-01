@@ -16,6 +16,14 @@ class NoLocationsInGroup(Exception):
     pass
 
 
+class HolidayDateConflict(Exception):
+    pass
+
+
+class NoFreeHolidaySlotError(Exception):
+    pass
+
+
 class HolidayLookup:
     def __init__(self, lookup_info: LookupInfo):
         self._lookup_info: LookupInfo = lookup_info
@@ -38,6 +46,51 @@ class HolidayLookup:
 
     def by_slot(self, slot: int) -> list["Holiday"]:
         return self._collect(self._base_statement.where(HOL.Type == slot))
+
+    def allocate(self,
+                 holiday_date: date,
+                 name: str,
+                 *,
+                 notes: str = "",
+                 recurring: bool = False) -> "Holiday":
+        target_dt = datetime.combine(holiday_date, datetime.min.time())
+        today_dt = datetime.combine(date.today(), datetime.min.time())
+
+        with self._lookup_info.new_session() as session:
+            existing = session.scalar(
+                self._base_statement.where(HOL.HolDate == target_dt)
+            )
+            if existing is not None:
+                raise HolidayDateConflict(
+                    f"A holiday already exists on {holiday_date.isoformat()} in slot {existing.Type}"
+                )
+
+            chosen_slot: Optional[int] = None
+            for slot in (1, 2, 3):
+                blocker = session.scalar(
+                    self._base_statement
+                        .where(HOL.Type == slot)
+                        .where(HOL.HolDate >= today_dt)
+                )
+                if blocker is None:
+                    chosen_slot = slot
+                    break
+
+            if chosen_slot is None:
+                raise NoFreeHolidaySlotError(
+                    "All three holiday slots are occupied by future-dated entries"
+                )
+
+        holiday = _Holiday(
+            self._lookup_info,
+            holiday_date=holiday_date,
+            slot=chosen_slot,
+            name=name,
+            notes=notes,
+            recurring=recurring,
+        )
+        holiday.write()
+        return holiday
 
     def _collect(self, statement) -> list["Holiday"]:
         with self._lookup_info.new_session() as session:
