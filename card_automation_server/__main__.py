@@ -14,6 +14,7 @@ from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.engines import AcsEngine, LogEngine
 from card_automation_server.windsx.lookup.access_card import AccessCardLookup
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_automation_server.windsx.lookup.holiday import HolidayLookup
 from card_automation_server.windsx.lookup.person import PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.card_pushed_watcher import CardPushedWatcher
@@ -23,6 +24,7 @@ from card_automation_server.workers.comm_server_socket_listener import CommServe
 from card_automation_server.workers.database_file_watcher import DatabaseFileWatcher
 from card_automation_server.workers.door_override_controller import DoorOverrideController
 from card_automation_server.workers.dsx_hardware_reset_worker import DSXHardwareResetWorker
+from card_automation_server.workers.expired_holiday_cleaner import ExpiredHolidayCleaner
 from card_automation_server.workers.github_watcher import GitHubWatcher
 from card_automation_server.workers.restart_file_watcher import RestartFileWatcher
 from card_automation_server.workers.update_callback_watcher import UpdateCallbackWatcher
@@ -62,6 +64,7 @@ class CardAutomationServer:
         # These get carried over to the plugins directly, might as well make them now
         self._resolver.singleton(AccessCardLookup)
         self._resolver.singleton(AclGroupComboLookup)
+        self._resolver.singleton(HolidayLookup)
         self._resolver.singleton(PersonLookup)
 
         self._worker_event_loop.add(
@@ -85,6 +88,8 @@ class CardAutomationServer:
             self._resolver.singleton(CommServerSocketListener),
             # Allow the server to be restarted with a file
             self._resolver.singleton(RestartFileWatcher),
+            # Periodically delete holiday rows whose date has passed
+            self._resolver.singleton(ExpiredHolidayCleaner),
         )
 
         self._logger.info("Main application loaded")

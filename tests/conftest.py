@@ -18,6 +18,7 @@ from card_automation_server.windsx.db.models import *
 from card_automation_server.windsx.engines import AcsEngine, LogEngine
 from card_automation_server.windsx.lookup.access_card import AccessCardLookup, AccessCard, ACTIVE_STOP_DATE
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
+from card_automation_server.windsx.lookup.holiday import HolidayLookup
 from card_automation_server.windsx.lookup.person import PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.events import CommServerEventType
@@ -569,6 +570,11 @@ def acl_group_combo_lookup(lookup_info: LookupInfo) -> AclGroupComboLookup:
 @pytest.fixture
 def access_card_lookup(lookup_info: LookupInfo) -> AccessCardLookup:
     return AccessCardLookup(lookup_info)
+
+
+@pytest.fixture
+def holiday_lookup(lookup_info: LookupInfo) -> HolidayLookup:
+    return HolidayLookup(lookup_info)
 
 
 class PluginWorkerFactory:

@@ -24,11 +24,6 @@ from tests.conftest import (
 )
 
 
-@pytest.fixture
-def holiday_lookup(lookup_info: LookupInfo) -> HolidayLookup:
-    return HolidayLookup(lookup_info)
-
-
 class TestHolidayLookup:
     def test_all_returns_one_logical_entry_per_date_in_group(self, holiday_lookup: HolidayLookup):
         holidays = holiday_lookup.all()
