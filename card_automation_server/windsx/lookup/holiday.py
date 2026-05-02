@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date as date_type, datetime
 from typing import Optional, Union
 
 from sqlalchemy import select
@@ -39,7 +39,7 @@ class HolidayLookup:
     def all(self) -> list["Holiday"]:
         return self._collect(self._base_statement)
 
-    def by_date(self, holiday_date: date) -> Optional["Holiday"]:
+    def by_date(self, holiday_date: date_type) -> Optional["Holiday"]:
         target_dt = datetime.combine(holiday_date, datetime.min.time())
         results = self._collect(self._base_statement.where(HOL.HolDate == target_dt))
         return results[0] if results else None
@@ -48,13 +48,13 @@ class HolidayLookup:
         return self._collect(self._base_statement.where(HOL.Type == slot))
 
     def allocate(self,
-                 holiday_date: date,
+                 holiday_date: date_type,
                  name: str,
                  *,
                  notes: str = "",
                  recurring: bool = False) -> "Holiday":
         target_dt = datetime.combine(holiday_date, datetime.min.time())
-        today_dt = datetime.combine(date.today(), datetime.min.time())
+        today_dt = datetime.combine(date_type.today(), datetime.min.time())
 
         with self._lookup_info.new_session() as session:
             existing = session.scalar(
@@ -118,7 +118,7 @@ class HolidayLookup:
 class _Holiday:
     def __init__(self,
                  lookup_info: LookupInfo,
-                 holiday_date: Optional[date] = None,
+                 holiday_date: Optional[date_type] = None,
                  slot: Optional[int] = None,
                  name: Optional[str] = None,
                  notes: str = "",
@@ -126,24 +126,24 @@ class _Holiday:
                  in_db: bool = False):
         self._lookup_info: LookupInfo = lookup_info
         self._location_group_id: int = lookup_info.location_group_id
-        self._date: Optional[date] = holiday_date
+        self._date: Optional[date_type] = holiday_date
         self._slot: Optional[int] = slot
         self._name: Optional[str] = name
         self._notes: str = notes
         self._recurring: bool = recurring
         self._in_db: bool = in_db
-        self._original_date: Optional[date] = holiday_date if in_db else None
+        self._original_date: Optional[date_type] = holiday_date if in_db else None
 
     @property
     def in_db(self) -> bool:
         return self._in_db
 
     @property
-    def date(self) -> Optional[date]:
+    def date(self) -> Optional[date_type]:
         return self._date
 
     @date.setter
-    def date(self, value: date):
+    def date(self, value: date_type):
         self._date = value
 
     @property
