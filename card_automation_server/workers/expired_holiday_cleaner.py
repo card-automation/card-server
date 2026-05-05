@@ -23,13 +23,16 @@ class ExpiredHolidayCleaner(ThreadedWorker[None]):
         return deleted
 
     def _run(self) -> None:
-        while not self._keep_running.is_set():
+        while True:
             try:
                 count = self.cleanup_expired()
                 if count > 0:
                     self._log.info(f"Cleaned up {count} expired holiday(s)")
             except Exception as ex:
                 self._log.exception(ex)
+
+            if self._keep_running.is_set():
+                break
 
             self._wake_event.wait(_CLEANUP_INTERVAL.seconds)
             self._wake_event.clear()

@@ -1,5 +1,6 @@
 import logging
 from datetime import date, datetime, timedelta
+from typing import Generator
 from unittest.mock import Mock
 
 import pytest
@@ -18,10 +19,14 @@ from tests.conftest import (
 
 
 @pytest.fixture
-def cleaner(holiday_lookup: HolidayLookup) -> ExpiredHolidayCleaner:
+def cleaner(holiday_lookup: HolidayLookup) -> Generator[ExpiredHolidayCleaner, None, None]:
     config = Mock()
     config.logger = logging.getLogger("test_expired_holiday_cleaner")
-    return ExpiredHolidayCleaner(config, holiday_lookup)
+    worker = ExpiredHolidayCleaner(config, holiday_lookup)
+    try:
+        yield worker
+    finally:
+        worker.stop(2)
 
 
 @pytest.fixture
@@ -43,8 +48,14 @@ def _seed_holiday(session: Session, holiday_date: date, slot: int) -> None:
     session.commit()
 
 
+def _run_one_cleanup(cleaner: ExpiredHolidayCleaner) -> None:
+    cleaner.start()
+    cleaner.stop(2)
+
+
+@pytest.mark.long
 class TestExpiredHolidayCleaner:
-    def test_cleanup_removes_past_holidays(
+    def test_running_worker_removes_past_holidays(
         self,
         cleaner: ExpiredHolidayCleaner,
         empty_holiday_calendar: None,
@@ -55,9 +66,7 @@ class TestExpiredHolidayCleaner:
         _seed_holiday(acs_data_session, today - timedelta(days=1), slot=2)
         _seed_holiday(acs_data_session, today + timedelta(days=10), slot=3)
 
-        deleted = cleaner.cleanup_expired()
-
-        assert deleted == 2
+        _run_one_cleanup(cleaner)
 
         remaining = acs_data_session.scalars(
             select(HOL)
@@ -67,7 +76,7 @@ class TestExpiredHolidayCleaner:
         assert {r.Type for r in remaining} == {3}
         assert len(remaining) == 2  # one row per Loc
 
-    def test_cleanup_keeps_today(
+    def test_running_worker_keeps_today(
         self,
         cleaner: ExpiredHolidayCleaner,
         empty_holiday_calendar: None,
@@ -75,7 +84,7 @@ class TestExpiredHolidayCleaner:
     ):
         _seed_holiday(acs_data_session, date.today(), slot=1)
 
-        assert cleaner.cleanup_expired() == 0
+        _run_one_cleanup(cleaner)
 
         remaining = acs_data_session.scalars(
             select(HOL)
@@ -84,14 +93,14 @@ class TestExpiredHolidayCleaner:
         ).all()
         assert len(remaining) == 2
 
-    def test_cleanup_returns_zero_when_calendar_empty(
+    def test_running_worker_with_empty_calendar_completes(
         self,
         cleaner: ExpiredHolidayCleaner,
         empty_holiday_calendar: None,
     ):
-        assert cleaner.cleanup_expired() == 0
+        _run_one_cleanup(cleaner)
 
-    def test_cleanup_ignores_other_location_groups(
+    def test_running_worker_ignores_other_location_groups(
         self,
         cleaner: ExpiredHolidayCleaner,
         empty_holiday_calendar: None,
@@ -107,13 +116,13 @@ class TestExpiredHolidayCleaner:
         ))
         acs_data_session.commit()
 
-        assert cleaner.cleanup_expired() == 0
+        _run_one_cleanup(cleaner)
 
         remaining = acs_data_session.scalars(select(HOL)).all()
         assert len(remaining) == 1
         assert remaining[0].Loc == bad_main_location_id
 
-    def test_cleanup_bumps_loc_dirty_flags_for_deleted(
+    def test_running_worker_bumps_loc_dirty_flags_for_deleted(
         self,
         cleaner: ExpiredHolidayCleaner,
         empty_holiday_calendar: None,
@@ -121,7 +130,7 @@ class TestExpiredHolidayCleaner:
     ):
         _seed_holiday(acs_data_session, date.today() - timedelta(days=1), slot=1)
 
-        cleaner.cleanup_expired()
+        _run_one_cleanup(cleaner)
 
         locations = acs_data_session.scalars(
             select(LOC).where(LOC.LocGrp == location_group_id)
