@@ -151,3 +151,6 @@ __pycache__
 
 # Don't accidentally commit private keys
 *.pem
+
+# Local directory used for research about the card access server
+research/
