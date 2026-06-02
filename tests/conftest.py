@@ -20,6 +20,7 @@ from card_automation_server.windsx.lookup.access_card import AccessCardLookup, A
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
 from card_automation_server.windsx.lookup.holiday import HolidayLookup
 from card_automation_server.windsx.lookup.person import PersonLookup
+from card_automation_server.windsx.lookup.timezone import TimezoneLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.events import CommServerEventType
 from card_automation_server.workers.plugin_worker import PluginWorker
@@ -179,6 +180,28 @@ def table_timezone(session: Session):
            Hol3Start=0,
            Hol3Stop=0,
            DlFlag=0),
+        # Annex-side mirrors of TZ 1/2/3 keep the location group consistent.
+        TZ(ID=1101, Loc=annex_location_id, TZ=1, Name="Always(24x7)", LinkStatus=0,
+           SunStart=0, SunStop=2400, MonStart=0, MonStop=2400, TueStart=0, TueStop=2400,
+           WedStart=0, WedStop=2400, ThuStart=0, ThuStop=2400, FriStart=0, FriStop=2400,
+           SatStart=0, SatStop=2400, Hol1Start=0, Hol1Stop=2400, Hol2Start=0, Hol2Stop=2400,
+           Hol3Start=0, Hol3Stop=2400, DlFlag=0),
+        TZ(ID=1102, Loc=annex_location_id, TZ=2, Name="Front Door Auto Unlock", LinkStatus=1,
+           SunStart=1300, SunStop=945, MonStart=1400, MonStop=1100, TueStart=1400, TueStop=1100,
+           WedStart=1400, WedStop=1100, ThuStart=1400, ThuStop=1100, FriStart=1400, FriStop=1100,
+           SatStart=2300, SatStop=1930, Hol1Start=0, Hol1Stop=2400, Hol2Start=0, Hol2Stop=2400,
+           Hol3Start=0, Hol3Stop=2400, DlFlag=0),
+        TZ(ID=1103, Loc=annex_location_id, TZ=3, Name="Work hours only", LinkStatus=1,
+           SunStart=0, SunStop=0, MonStart=800, MonStop=1800, TueStart=800, TueStop=1800,
+           WedStart=800, WedStop=1800, ThuStart=800, ThuStop=1800, FriStart=800, FriStop=1800,
+           SatStart=0, SatStop=0, Hol1Start=0, Hol1Stop=0, Hol2Start=0, Hol2Stop=0,
+           Hol3Start=0, Hol3Stop=0, DlFlag=0),
+        # Bad location group: same TZ number as a real one, must be filtered out by all reads.
+        TZ(ID=1199, Loc=bad_main_location_id, TZ=1, Name="Bad Group Always", LinkStatus=0,
+           SunStart=0, SunStop=2400, MonStart=0, MonStop=2400, TueStart=0, TueStop=2400,
+           WedStart=0, WedStop=2400, ThuStart=0, ThuStop=2400, FriStart=0, FriStop=2400,
+           SatStart=0, SatStop=2400, Hol1Start=0, Hol1Stop=2400, Hol2Start=0, Hol2Stop=2400,
+           Hol3Start=0, Hol3Stop=2400, DlFlag=0),
     ])
 
 
@@ -575,6 +598,11 @@ def access_card_lookup(lookup_info: LookupInfo) -> AccessCardLookup:
 @pytest.fixture
 def holiday_lookup(lookup_info: LookupInfo) -> HolidayLookup:
     return HolidayLookup(lookup_info)
+
+
+@pytest.fixture
+def timezone_lookup(lookup_info: LookupInfo) -> TimezoneLookup:
+    return TimezoneLookup(lookup_info)
 
 
 class PluginWorkerFactory:

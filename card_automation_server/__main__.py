@@ -16,6 +16,7 @@ from card_automation_server.windsx.lookup.access_card import AccessCardLookup
 from card_automation_server.windsx.lookup.acl_group_combo import AclGroupComboLookup
 from card_automation_server.windsx.lookup.holiday import HolidayLookup
 from card_automation_server.windsx.lookup.person import PersonLookup
+from card_automation_server.windsx.lookup.timezone import TimezoneLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.card_pushed_watcher import CardPushedWatcher
 from card_automation_server.workers.card_scan_watcher import CardScanWatcher
@@ -66,6 +67,7 @@ class CardAutomationServer:
         self._resolver.singleton(AclGroupComboLookup)
         self._resolver.singleton(HolidayLookup)
         self._resolver.singleton(PersonLookup)
+        self._resolver.singleton(TimezoneLookup)
 
         self._worker_event_loop.add(
             # When someone updates a data model.
