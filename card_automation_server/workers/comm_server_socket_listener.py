@@ -105,7 +105,7 @@ class CommServerSocketListener(ThreadedWorker[None]):
                     break
                 content.extend(response)
 
-            lines = [x for x in content.decode('ascii').split('\r\n') if len(x) > 0]
+            lines = [x for x in content.decode('cp1252').split('\r\n') if len(x) > 0]
 
             if len(lines) == 0:
                 return []
