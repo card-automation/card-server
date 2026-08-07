@@ -11,7 +11,7 @@ from card_automation_server.windsx.lookup.access_card import AccessCardLookup, A
 from card_automation_server.windsx.lookup.person import Person, PersonLookup
 from card_automation_server.windsx.lookup.utils import LookupInfo
 from card_automation_server.workers.events import LocCardUpdated
-from tests.conftest import main_location_id, annex_location_id
+from tests.conftest import main_location_id, annex_location_id, location_group_id
 
 _acl_name_master_access_level = "Master Access Level"
 _acl_name_main_building_access = "Main Building Access"
@@ -416,6 +416,38 @@ class TestAccessCardWrite:
         access_card: AccessCard = access_card_lookup.by_card_number(2000)
         assert access_card.in_db
         assert access_card.person.id == 403
+
+    def test_person_can_be_set_to_none(self,
+                                       access_card_lookup: AccessCardLookup):
+        access_card: AccessCard = access_card_lookup.by_card_number(3000)
+        assert access_card.person is not None
+        assert access_card.name_id == 101
+
+        access_card.person = None
+
+        assert access_card.person is None
+        assert access_card.name_id is None
+
+    def test_eager_load_with_missing_person_sets_person_to_none(self,
+                                                                access_card_lookup: AccessCardLookup,
+                                                                acs_data_session: Session):
+        acs_data_session.add(CARDS(
+            ID=8,
+            LocGrp=location_group_id,
+            NameID=999,
+            Code=2005,
+            AclGrpComboID=0,
+            Status=False,
+            StartDate=datetime(year=2000, month=1, day=1),
+            StopDate=datetime(year=2000, month=1, day=1),
+        ))
+        acs_data_session.commit()
+
+        cards = access_card_lookup.with_people().by_card_numbers(2005)
+
+        assert len(cards) == 1
+        assert cards[0].person is None
+        assert cards[0].name_id is None
 
     def test_writing_card_creates_needed_device_groups(self,
                                                        db_helper: DbHelper,

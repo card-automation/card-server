@@ -172,8 +172,11 @@ class _AccessCard:
         return self._person
 
     @person.setter
-    def person(self, value: Union[Person, int]):
-        if isinstance(value, int):
+    def person(self, value: Union[Person, int, None]):
+        if value is None:
+            self._person = None
+            self._name_id = None
+        elif isinstance(value, int):
             self._person = None
             self._name_id = value
         else:
