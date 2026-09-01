@@ -1,3 +1,4 @@
+import logging
 import signal
 import sys
 import time
@@ -9,6 +10,7 @@ from sentry_sdk import capture_exception
 
 from card_automation_server.config import Config
 from ioc import Resolver
+from card_automation_server.loki_logging import configure_loki_logging
 from card_automation_server.plugin_loader import PluginLoader
 from card_automation_server.windsx.db.engine_factory import EngineFactory
 from card_automation_server.windsx.engines import AcsEngine, LogEngine
@@ -39,13 +41,7 @@ class CardAutomationServer:
         self._resolver.singleton(self._platformdirs)
 
         self._config = self._resolver.singleton(Config)
-        sentry_sdk.init(self._config.sentry.dsn)
         self._logger = self._config.logger
-
-        self._logger.info("Application Starting")
-
-        self._worker_event_loop = self._resolver.singleton(WorkerEventLoop)
-        self._worker_event_loop.start()
 
         # Create our type hinted engines
         acs_engine = EngineFactory.microsoft_access(self._config.windsx.acs_data_db_path)
@@ -53,7 +49,7 @@ class CardAutomationServer:
         log_engine = EngineFactory.microsoft_access(self._config.windsx.log_db_path)
         self._resolver.singleton(LogEngine, log_engine)
 
-        # Needed to create LookupInfo object
+        # Needed to create LookupInfo object. It's a Worker, but not a threaded one, so making it here starts nothing.
         update_callback_watcher = self._resolver.singleton(UpdateCallbackWatcher)
 
         lookup_info: LookupInfo = self._resolver(LookupInfo,
@@ -69,9 +65,29 @@ class CardAutomationServer:
         self._resolver.singleton(PersonLookup)
         self._resolver.singleton(TimezoneLookup)
 
+        self._worker_event_loop: Optional[WorkerEventLoop] = None
+
+    @property
+    def resolver(self) -> Resolver:
+        return self._resolver
+
+    def start(self):
+        sentry_sdk.init(self._config.sentry.dsn)
+        configure_loki_logging(
+            url=self._config.loki.url,
+            username=self._config.loki.username,
+            password=self._config.loki.password,
+            level=logging.getLevelName(self._config.loki.level),
+        )
+
+        self._logger.info("Application Starting")
+
+        self._worker_event_loop = self._resolver.singleton(WorkerEventLoop)
+        self._worker_event_loop.start()
+
         self._worker_event_loop.add(
             # When someone updates a data model.
-            self._resolver.singleton(update_callback_watcher),
+            self._resolver.singleton(UpdateCallbackWatcher),
             # When the comm server isn't running, we restart it
             self._resolver.singleton(CommServerRestarter),
             # When the card can't be pushed, and we have to give the hardware a little nudge
@@ -95,7 +111,7 @@ class CardAutomationServer:
         )
 
         self._logger.info("Main application loaded")
-        plural = "" if len(self._config.plugins) == 1 else ""
+        plural = "" if len(self._config.plugins) == 1 else "s"
         self._logger.info(f"Loading {len(self._config.plugins.items())} plugin{plural}")
 
         for owner_repo, plugin in self._config.plugins.items():
@@ -115,31 +131,27 @@ class CardAutomationServer:
 
     @property
     def is_alive(self) -> bool:
-        return self._worker_event_loop.is_alive
+        return self._worker_event_loop is not None and self._worker_event_loop.is_alive
 
     def stop(self):
-        self._worker_event_loop.stop()
+        if self._worker_event_loop is not None:
+            self._worker_event_loop.stop()
         self._logger.info("Goodbye!")
 
 
-cas: Optional[CardAutomationServer] = None
-
-
 def main():
-    global cas
-    cas = CardAutomationServer()
+    cas: CardAutomationServer = CardAutomationServer()
+
+    def handle_interrupt(_, __):
+        cas.stop()
+        sys.exit(1)  # Exit with an error code so our calling function doesn't try to restart us
+
+    signal.signal(signal.SIGINT, handle_interrupt)
+
+    cas.start()
     while cas.is_alive:
         time.sleep(1)
 
-
-def handle_interrupt(_, __):
-    global cas
-    if cas is not None:
-        cas.stop()
-    sys.exit(1)  # Exit with an error code so our calling function doesn't try to restart us
-
-
-signal.signal(signal.SIGINT, handle_interrupt)
 
 if __name__ == '__main__':
     main()

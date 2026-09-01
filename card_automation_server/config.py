@@ -1,5 +1,4 @@
 import abc
-import logging
 import sys
 from pathlib import Path
 from typing import Optional, Tuple
@@ -7,7 +6,6 @@ from typing import Optional, Tuple
 import tomlkit
 from platformdirs import PlatformDirs
 
-from card_automation_server.loki_logging import configure_loki_logging
 from card_automation_server.plugins.config import ConfigHolder, ConfigProperty, BaseConfig, ConfigPath, TomlConfigType, \
     LogPath
 
@@ -163,13 +161,6 @@ class Config(BaseConfig):
         log_path: Path = log_root / "card-server.log"
 
         super().__init__(ConfigPath(config_path), LogPath(log_path))
-
-        configure_loki_logging(
-            url=self.loki.url,
-            username=self.loki.username,
-            password=self.loki.password,
-            level=logging.getLevelName(self.loki.level),
-        )
 
     @property
     def config_root(self) -> Path:
