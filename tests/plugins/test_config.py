@@ -8,6 +8,8 @@ from card_automation_server.plugins.config import ConfigHolder, BaseConfig, Conf
 
 
 class TestEnum(enum.Enum):
+    __test__ = False  # Not a test class, pytest just sees the name and tries to collect it
+
     PEAR = enum.auto()
     APPLE = "apple"
 

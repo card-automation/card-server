@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from pathlib import Path
 from typing import Generator, Callable, Optional
@@ -628,6 +629,35 @@ class PluginWorkerFactory:
 def plugin_worker_factory() -> Generator[PluginWorkerFactory, None, None]:
     with PluginWorkerFactory() as pwf:
         yield pwf
+
+
+@pytest.fixture(autouse=True)
+def _restore_log_handlers():
+    """
+    Snapshot and restore log handlers so each test gets a clean slate.
+
+    A config attaches its handlers to a logger that's global to its module name. Production only ever builds one
+    config, but tests build one per test, so without this they stack up. Every handler a previous test left behind
+    holds the capture stream pytest has since closed, so a single log line turns into a screen of logging errors.
+    """
+    def loggers():
+        yield logging.getLogger()
+        for logger in list(logging.Logger.manager.loggerDict.values()):
+            if isinstance(logger, logging.Logger):
+                yield logger
+
+    # Loggers created during the test aren't in here, which is what we want: none of their handlers are ours to keep.
+    saved = {logger: list(logger.handlers) for logger in loggers()}
+
+    yield
+
+    for logger in loggers():
+        for handler in list(logger.handlers):
+            if handler in saved.get(logger, []):
+                continue
+
+            logger.removeHandler(handler)
+            handler.close()
 
 
 @pytest.fixture
