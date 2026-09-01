@@ -1,4 +1,5 @@
 import threading
+from datetime import timedelta
 from typing import Union
 
 import pytest
@@ -34,6 +35,30 @@ class UnacceptingWorker(EventsWorker[LogDatabaseUpdated]):
     def _handle_event(self, event):
         self.sent_event = event
         self.called.set()
+
+
+class ThrowingHandlerWorker(EventsWorker[AcsDatabaseUpdated]):
+    def __init__(self):
+        super().__init__()
+        self.handled = threading.Semaphore(0)
+
+    def _handle_event(self, event):
+        self.handled.release()
+        raise Exception("I refuse to handle this")
+
+
+class ThrowingCallbackWorker(EventsWorker[AcsDatabaseUpdated]):
+    def __init__(self):
+        super().__init__()
+        self.called = threading.Semaphore(0)
+        self._call_every(timedelta(milliseconds=1), self._callback)
+
+    def _callback(self) -> None:
+        self.called.release()
+        raise Exception("I refuse to be called")
+
+    def _handle_event(self, event):
+        pass
 
 
 class UnionEventWorker(EventsWorker[Union[AcsDatabaseUpdated, LogDatabaseUpdated]]):
@@ -119,3 +144,36 @@ class TestWorkerEventLoop:
         assert event_loop._wait_on_events(3)
 
         assert not event_loop.is_alive
+
+
+class TestEventsWorkerErrorHandling:
+    @pytest.mark.long
+    def test_throwing_event_handler_does_not_kill_the_worker(self, caplog):
+        worker = ThrowingHandlerWorker()
+        worker.start()
+
+        try:
+            worker.event(AcsDatabaseUpdated())
+            assert worker.handled.acquire(timeout=3)
+
+            # The first event blew up. The worker still has to be around for the second one.
+            worker.event(AcsDatabaseUpdated())
+            assert worker.handled.acquire(timeout=3)
+
+            assert worker.is_alive
+        finally:
+            worker.stop(3)
+
+    @pytest.mark.long
+    def test_throwing_periodic_callback_does_not_kill_the_worker(self, caplog):
+        worker = ThrowingCallbackWorker()
+        worker.start()
+
+        try:
+            # Called, threw, and got called again on the next interval anyway.
+            assert worker.called.acquire(timeout=3)
+            assert worker.called.acquire(timeout=3)
+
+            assert worker.is_alive
+        finally:
+            worker.stop(3)

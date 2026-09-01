@@ -2,8 +2,6 @@ import base64
 import importlib.resources
 import io
 import json
-import subprocess
-import sys
 import threading
 import zipfile
 from datetime import timedelta
@@ -305,6 +303,9 @@ class GitHubWatcher(EventsWorker[_Events]):
             return
         deploy, github = self._get_deploy_and_github(owner, repo)
 
+        if deploy is None or github is None:
+            raise Exception("Couldn't find required pieces for update")
+
         latest_commit: Commit = github.rest.repos.list_commits(
             owner=owner,
             repo=repo,
@@ -341,19 +342,30 @@ class GitHubWatcher(EventsWorker[_Events]):
 
     def _handle_update_available(self, event: UpdateAvailable):
         self._log.info(f"Update available for {event.owner}/{event.repo}")
-        deploy, github = self._get_deploy_and_github(event.owner, event.repo)
+        restarting = False
+        try:
+            deploy, github = self._get_deploy_and_github(event.owner, event.repo)
 
-        if deploy is None or github is None:
-            raise Exception("Couldn't find required pieces for update")
+            if deploy is None or github is None:
+                raise Exception("Couldn't find required pieces for update")
 
-        self._deploy_update(
-            github=github,
-            repo_owner=event.owner,
-            repo_name=event.repo,
-            commit=event.commit,
-            has_commit_versions=deploy,
-            environment=self._config.deploy.environment
-        )
+            if self._config.deploy.environment is None:
+                raise Exception("Unknown environment for GitHub deploy")
+
+            restarting = self._deploy_update(
+                github=github,
+                repo_owner=event.owner,
+                repo_name=event.repo,
+                commit=event.commit,
+                has_commit_versions=deploy,
+                environment=self._config.deploy.environment
+            )
+        finally:
+            if not restarting:
+                # We only get a fresh flag by restarting the application. If we're not about to do that, whether we
+                # decided against deploying or something threw, we have to hand the flag back or we'd never look for
+                # another update again.
+                self._deployment_in_progress.clear()
 
     def _deploy_update(self,
                        github: GitHub,
@@ -361,7 +373,11 @@ class GitHubWatcher(EventsWorker[_Events]):
                        repo_name: str,
                        commit: str,
                        has_commit_versions: _HasCommitVersions,
-                       environment: str):
+                       environment: str) -> bool:
+        """
+        :return: Whether we deployed and asked the application to restart. A False return means the caller still owns
+                 the deployment in progress flag and has to release it.
+        """
         self._deployment_in_progress.set()
 
         deployments = github.rest.repos.list_deployments(
@@ -376,33 +392,37 @@ class GitHubWatcher(EventsWorker[_Events]):
         our_deployment: Optional[Deployment] = None
         in_progress = False
 
+        # GitHub hands these back newest first, so the first deployment is the one that matters for this commit.
         for deployment in deployments:
             statuses = github.rest.repos.list_deployment_statuses(
                 owner=repo_owner,
                 repo=repo_name,
                 deployment_id=deployment.id,
             ).parsed_data
-            if len(statuses) == 0:
-                our_deployment = deployment
-                should_deploy = True
-                break  # It's queued, we can work with this
 
-            for status in statuses:
-                # If it succeeded, we shouldn't have even been told about it.
-                # If it failed, a new commit will probably be pushed
-                if status.state in ["success", "failure"]:
-                    should_deploy = False
-                    break
+            # Statuses come back newest first too. "inactive" just marks a deployment as superseded, it doesn't tell us
+            # anything about how the deployment itself went, so we look past it for the real state.
+            state = next((status.state for status in statuses if status.state != "inactive"), None)
 
-                if status.state == "in_progress":
-                    our_deployment = deployment
-                    in_progress = True
-                    should_deploy = True
+            # If it succeeded, we shouldn't have even been told about it.
+            # If it failed or errored, a new commit will probably be pushed.
+            if state in ["success", "failure", "error"]:
+                should_deploy = False
+                break
+
+            # Everything else means nobody has finished this deployment. Either it hasn't started (no statuses at all,
+            # "queued", or "pending") or we were interrupted partway through it ("in_progress"). Both are ours to pick
+            # up, we just don't want to re-announce one that's already marked as running.
+            our_deployment = deployment
+            in_progress = state == "in_progress"
+            should_deploy = True
+            break
 
         if not should_deploy:
-            return
+            self._log.info(f"Not deploying {repo_owner}/{repo_name}@{commit}, it already has a finished deployment")
+            return False
 
-        if len(deployments) == 0:
+        if our_deployment is None:
             our_deployment = github.rest.repos.create_deployment(
                 owner=repo_owner,
                 repo=repo_name,
@@ -466,6 +486,8 @@ class GitHubWatcher(EventsWorker[_Events]):
 
         self._outbound_event_queue.put(ApplicationRestartNeeded())  # Tell the worker event loop to stop everything
 
+        return True
+
     def _complete_deployments(self):
         self._complete_deployment_for_repo(
             github=self._github_main,
@@ -493,6 +515,11 @@ class GitHubWatcher(EventsWorker[_Events]):
                                       repo_name: str,
                                       commit: str,
                                       environment: str):
+        if commit is None:
+            # We've never deployed this one, so there's no deployment of ours to finish. Passing None through ends up
+            # on the wire as `?sha=`, which is not the sha filter we're asking for.
+            return
+
         deployments = github.rest.repos.list_deployments(
             owner=repo_owner,
             repo=repo_name,

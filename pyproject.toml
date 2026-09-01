@@ -15,7 +15,7 @@ dependencies = [
     "pyodbc",
     "python-logging-loki",
     "requests",
-    "sentry-sdk==2.8.0",
+    "sentry-sdk>=2.22.0",
     "SQLAlchemy",
     "sqlalchemy-access",
     "tomlkit",

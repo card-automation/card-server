@@ -1,17 +1,36 @@
 import abc
+import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from logging import Logger
 from pathlib import Path
 from queue import Queue, Empty
 from typing import Optional, TypeVar, Generic, Callable
 
+from sentry_sdk import capture_exception
 from watchdog.events import FileSystemEventHandler, FileSystemEvent, FileModifiedEvent
 from watchdog.observers import Observer
 
 from card_automation_server.config import Config
 
 T = TypeVar('T')
+
+
+def _report_exception(log: Logger, ex: BaseException) -> None:
+    """
+    Reports an exception without ever raising one of its own. Callers are catching an exception to keep a thread
+    alive, so the logger or Sentry throwing can't be allowed to undo that.
+    """
+    try:
+        log.exception(ex)
+    except BaseException:
+        pass
+
+    try:
+        capture_exception(ex)
+    except BaseException:
+        pass
 
 
 class Worker(abc.ABC):
@@ -37,8 +56,18 @@ class ThreadedWorker(Generic[T], Worker):
         self._keep_running = threading.Event()
         self._wake_event = threading.Event()
         self._inbound_event_queue: Queue = Queue()
+        # Subclasses that have a better logger are expected to overwrite this after calling us.
+        self._log: Logger = logging.getLogger(self.__class__.__name__)
 
-        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread = threading.Thread(target=self.__thread_target, daemon=True)
+
+    def __thread_target(self) -> None:
+        try:
+            self._run()
+        except BaseException as ex:
+            # This thread is done for, but nothing above us would otherwise hear about why. Make sure it gets reported
+            # instead of disappearing into the default thread excepthook.
+            _report_exception(self._log, ex)
 
     @property
     def is_alive(self) -> bool:
@@ -134,10 +163,12 @@ class EventsWorker(ThreadedWorker[T]):
                 if to_call.next_call is not None and to_call.next_call > now:
                     continue
 
-                to_call.callback()
+                self._guard(to_call.callback)
+                # _guard swallowed anything that went wrong, so a failed call still waits out the full interval
+                # instead of us hammering whatever just broke.
                 to_call.next_call = now + to_call.how_often
 
-            self._pre_event()
+            self._guard(self._pre_event)
 
             # There is a small race condition where we can have either two events submitted or an event and an exit
             # request that would both set the _wake_event flag. In other words, regardless of the wake event state, we
@@ -146,21 +177,32 @@ class EventsWorker(ThreadedWorker[T]):
             event: Optional[T] = None
             try:
                 event = self._inbound_event_queue.get_nowait()
-                self._handle_event(event)
             except Empty:
                 # No event to check.
                 pass
-            finally:
-                if event is not None:
-                    self._inbound_event_queue.task_done()
+
+            if event is not None:
+                self._guard(lambda: self._handle_event(event))
+                self._inbound_event_queue.task_done()
 
             if self._keep_running.is_set() and event is None:
                 # We were told to exit and have no more events to process
                 break
 
-            self._post_event()
+            self._guard(self._post_event)
 
         self._post_run()
+
+    def _guard(self, callback: Callable[[], None]) -> None:
+        """
+        Runs a callback, reporting any exception instead of letting it out. An exception escaping this event loop kills
+        the worker thread, and a dead worker silently stops doing its job until the whole application is restarted. A
+        transient failure, like the GitHub API having a bad day, should cost us one interval and nothing more.
+        """
+        try:
+            callback()
+        except BaseException as ex:
+            _report_exception(self._log, ex)
 
     @abc.abstractmethod
     def _handle_event(self, event: T):
